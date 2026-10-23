@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import html
+import json
+
+from qlik2pbi.qvf import JS_EXTRAER, MENSAJE_QVF_DANADO, SOBRE
 
 _ESTILO = """
     :root { color-scheme: light; }
@@ -76,68 +79,104 @@ def html_acceso(mensaje: str = "", cerrada: bool = False) -> str:
 
 
 def html_convertidor() -> str:
-    cuerpo = """
+    mensaje = json.dumps(MENSAJE_QVF_DANADO, ensure_ascii=False)
+    sobre = json.dumps(SOBRE)
+    cuerpo = f"""
     <form id="formulario">
       <label>Script de carga (.qvs)
-        <input id="script" name="script" type="file" accept=".qvs,.txt,.qlik" required>
+        <input id="script" name="script" type="file" accept=".qvs,.txt" required>
       </label>
-      <label>Exportación de la app (.json, .xml o .qvf)
-        <input id="export" name="export" type="file" accept=".json,.xml,.qvf" required>
+      <label>App de Qlik Sense (.qvf)
+        <input id="qvf" name="qvf" type="file" accept=".qvf" required>
       </label>
       <button type="submit">Generar y descargar ZIP</button>
       <p id="estado" role="status"></p>
     </form>
     <footer>
-      <p>La sesión dura 12 horas en este navegador. Cada fichero puede pesar hasta 4 MB. El ZIP incluye el modelo, las medidas, las páginas y un INFORME.md. No se guarda nada en el servidor.</p>
+      <p>La sesión dura 12 horas en este navegador. El .qvs puede pesar hasta 4 MB. El .qvf se lee en este navegador y solo se envían las hojas, los objetos y las medidas, no las filas de datos. El ZIP incluye el modelo, las medidas, las páginas y un INFORME.md. No se guarda nada en el servidor.</p>
     </footer>
     <script>
+      __JS_EXTRAER__
       const form = document.getElementById("formulario");
       const estado = document.getElementById("estado");
       const boton = form.querySelector("button");
-      form.addEventListener("submit", async (evento) => {
+      const MENSAJE_QVF = {mensaje};
+      const TOPE = 4 * 1024 * 1024;
+      form.addEventListener("submit", async (evento) => {{
         evento.preventDefault();
         estado.className = "";
-        estado.textContent = "Generando el proyecto…";
+        estado.textContent = "Leyendo la app…";
         boton.disabled = true;
-        const datos = new FormData();
-        datos.append("script", document.getElementById("script").files[0]);
-        datos.append("export", document.getElementById("export").files[0]);
-        try {
-          const respuesta = await fetch("/api/convert", { method: "POST", body: datos });
-          if (!respuesta.ok) {
+        try {{
+          const script = document.getElementById("script").files[0];
+          const qvf = document.getElementById("qvf").files[0];
+          if (!script || !qvf) throw new Error("Hay que subir el script de carga (.qvs) y la app (.qvf).");
+          const nombre = (qvf.name || "").toLowerCase();
+          if (!nombre.endsWith(".qvf")) throw new Error("La app tiene que ser un fichero .qvf de Qlik Sense.");
+          let objetos;
+          try {{
+            objetos = await extraerObjetosQvf(new Uint8Array(await qvf.arrayBuffer()));
+          }} catch (error) {{
+            throw new Error(MENSAJE_QVF);
+          }}
+          if (!objetos.length) throw new Error(MENSAJE_QVF);
+          const sobre = JSON.stringify({{
+            qlik2pbi: {sobre},
+            fichero: qvf.name,
+            objetos: objetos.map(recortar)
+          }});
+          if (sobre.length > TOPE) {{
+            throw new Error("Los metadatos de esta app superan 4 MB. Usa la línea de comandos, que lee el .qvf en local.");
+          }}
+          estado.textContent = "Generando el proyecto…";
+          const datos = new FormData();
+          datos.append("script", script);
+          datos.append("export", new Blob([sobre], {{ type: "application/json" }}), qvf.name + ".metadatos.json");
+          const respuesta = await fetch("/api/convert", {{ method: "POST", body: datos }});
+          if (!respuesta.ok) {{
             let mensaje = "No se ha podido generar el proyecto.";
-            try {
+            try {{
               const cuerpo = await respuesta.json();
               if (cuerpo.error) mensaje = cuerpo.error;
-            } catch (e) { /* el cuerpo no era JSON */ }
+            }} catch (e) {{ /* el cuerpo no era JSON */ }}
             throw new Error(mensaje);
-          }
+          }}
           const blob = await respuesta.blob();
           const avisos = respuesta.headers.get("X-Avisos");
           const dispo = respuesta.headers.get("Content-Disposition") || "";
           const coincidencia = dispo.match(/filename="([^"]+)"/);
-          const nombre = coincidencia ? coincidencia[1] : "qlik2pbi.zip";
+          const descarga = coincidencia ? coincidencia[1] : "qlik2pbi.zip";
           const url = URL.createObjectURL(blob);
           const enlace = document.createElement("a");
           enlace.href = url;
-          enlace.download = nombre;
+          enlace.download = descarga;
           enlace.click();
           URL.revokeObjectURL(url);
           estado.textContent = avisos && avisos !== "0"
             ? "ZIP descargado. El INFORME.md del paquete lista " + avisos + " avisos para revisar."
             : "ZIP descargado. Ábrelo en Power BI Desktop.";
-        } catch (error) {
+        }} catch (error) {{
           estado.className = "aviso";
           estado.textContent = error.message;
-        } finally {
+        }} finally {{
           boton.disabled = false;
-        }
-      });
+        }}
+      }});
+      function recortar(valor) {{
+        if (Array.isArray(valor)) return valor.map(recortar);
+        if (!valor || typeof valor !== "object") return valor;
+        const copia = {{}};
+        for (const clave of Object.keys(valor)) {{
+          if (clave === "allFields" || clave === "qDataPages" || clave === "qMatrix" || clave === "qStackedDataPages" || clave === "qPivotDataPages" || clave === "qGrandTotalRow") continue;
+          copia[clave] = recortar(valor[clave]);
+        }}
+        return copia;
+      }}
     </script>
     """
     return _documento(
-        "Sube el script de carga y la exportación de la app. El proyecto se genera en memoria.",
-        cuerpo,
+        "Sube el script de carga (.qvs) y la app de Qlik Sense (.qvf). El proyecto se genera en memoria.",
+        cuerpo.replace("__JS_EXTRAER__", JS_EXTRAER),
     )
 
 

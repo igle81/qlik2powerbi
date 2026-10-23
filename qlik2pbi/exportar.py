@@ -1,4 +1,4 @@
-"""Lectura de la exportación de la app Qlik (JSON, XML o QVF comprimido)."""
+"""Lectura de la app Qlik: un .qvf de Qlik Sense, o un JSON/XML si ese .qvf está dañado."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from xml.etree import ElementTree
 
 from qlik2pbi.notas import Notas
+from qlik2pbi.qvf import MENSAJE_QVF_DANADO, es_sobre, leer_qvf, leer_sobre, parece_qvf
 
 
 @dataclass
@@ -27,6 +28,12 @@ class ExpVisual:
 
 
 @dataclass
+class ExpVariable:
+    nombre: str
+    definicion: str
+
+
+@dataclass
 class ExpHoja:
     titulo: str
     visuales: list[ExpVisual] = field(default_factory=list)
@@ -38,22 +45,48 @@ class Exportacion:
     medidas: list[ExpMedida] = field(default_factory=list)
     dimensiones: list[str] = field(default_factory=list)
     hojas: list[ExpHoja] = field(default_factory=list)
+    variables: list[ExpVariable] = field(default_factory=list)
+    script: str = ""
 
 
 def leer_exportacion(data: bytes, nombre_fichero: str, notas: Notas) -> Exportacion:
     bruto = data or b""
     nombre = (nombre_fichero or "").lower()
-    if nombre.endswith(".qvf") or bruto[:2] == b"PK":
-        extraido, detalle = _desde_qvf(bruto)
+    if es_sobre(bruto):
+        return leer_sobre(bruto, notas, nombre_fichero)
+    if parece_qvf(bruto):
+        leido = leer_qvf(bruto, notas, nombre_fichero)
+        if leido is None:
+            raise ValueError(MENSAJE_QVF_DANADO)
+        return leido
+    if nombre.endswith(".qvf"):
+        if bruto[:2] == b"PK":
+            extraido = _json_de_zip(bruto)
+            if extraido is None:
+                raise ValueError(MENSAJE_QVF_DANADO)
+            notas.info("QVF", "Se ha leído el JSON de hojas que iba dentro del .qvf.")
+            bruto = extraido
+        else:
+            texto = _decodificar(bruto)
+            if texto.lstrip()[:1] in "{[<":
+                return _desde_texto(texto)
+            raise ValueError(MENSAJE_QVF_DANADO)
+    elif bruto[:2] == b"PK":
+        extraido = _json_de_zip(bruto)
         if extraido is None:
-            raise ValueError(detalle or "No se ha podido leer el .qvf. Exporta los objetos a JSON.")
-        if detalle:
-            notas.info("QVF", detalle)
+            raise ValueError(MENSAJE_QVF_DANADO)
         bruto = extraido
+    return _desde_texto(_decodificar(bruto))
+
+
+def _decodificar(bruto: bytes) -> str:
     try:
-        texto = bruto.decode("utf-8-sig")
+        return bruto.decode("utf-8-sig")
     except UnicodeDecodeError:
-        texto = bruto.decode("cp1252", errors="replace")
+        return bruto.decode("cp1252", errors="replace")
+
+
+def _desde_texto(texto: str) -> Exportacion:
     if not texto.strip():
         raise ValueError("La exportación está vacía.")
     if texto.lstrip().startswith("<"):
@@ -67,17 +100,15 @@ def leer_exportacion(data: bytes, nombre_fichero: str, notas: Notas) -> Exportac
     return _desde_json(dato)
 
 
-def _desde_qvf(data: bytes) -> tuple[bytes | None, str]:
+def _json_de_zip(data: bytes) -> bytes | None:
     try:
         paquete = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
-        return None, "El .qvf no es un ZIP legible. Exporta la app a JSON desde Qlik."
+        return None
     candidatos: list[tuple[int, bytes]] = []
     with paquete:
         for info in paquete.infolist():
-            if info.is_dir():
-                continue
-            if not info.filename.lower().endswith(".json"):
+            if info.is_dir() or not info.filename.lower().endswith(".json"):
                 continue
             contenido = paquete.read(info)
             try:
@@ -88,9 +119,9 @@ def _desde_qvf(data: bytes) -> tuple[bytes | None, str]:
                 peso = (2 if "sheets" in dato or "qSheets" in dato else 0) + (1 if "measures" in dato else 0)
                 candidatos.append((peso, contenido))
     if not candidatos:
-        return None, "El .qvf no contiene un JSON de hojas. Exporta los objetos de la app."
+        return None
     candidatos.sort(key=lambda par: par[0], reverse=True)
-    return candidatos[0][1], "Se ha leído el JSON de hojas que iba dentro del .qvf."
+    return candidatos[0][1]
 
 
 def _desde_json(dato: dict) -> Exportacion:
