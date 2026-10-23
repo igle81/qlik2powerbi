@@ -53,16 +53,34 @@ def validar_directorio(carpeta: Path) -> list[str]:
             errores.append("definition.pbism no está en version 4.0.")
     except (OSError, json.JSONDecodeError) as exc:
         errores.append(f"definition.pbism no es válido: {exc}")
-    for relativo in ("definition/database.tmdl", "definition/model.tmdl", "definition/relationships.tmdl"):
+    for relativo in ("definition/database.tmdl", "definition/model.tmdl"):
         if not (modelo / relativo).is_file():
             errores.append(f"Falta {relativo}.")
+    if (modelo / "definition" / "database.tmdl").is_file():
+        database = (modelo / "definition" / "database.tmdl").read_text(encoding="utf-8")
+        if not database.startswith("database"):
+            errores.append("database.tmdl no declara el objeto database.")
+        if "compatibilityLevel:" not in database:
+            errores.append("database.tmdl no declara compatibilityLevel.")
+    if (modelo / "definition" / "model.tmdl").is_file():
+        model_tmdl = (modelo / "definition" / "model.tmdl").read_text(encoding="utf-8")
+        if not model_tmdl.startswith("model "):
+            errores.append("model.tmdl no declara el objeto model.")
+        if "ref table " not in model_tmdl:
+            errores.append("model.tmdl no referencia las tablas.")
+    relaciones = modelo / "definition" / "relationships.tmdl"
+    if relaciones.is_file() and "relationship " not in relaciones.read_text(encoding="utf-8"):
+        errores.append("No hay relaciones en relationships.tmdl.")
+    for ruta in (modelo / "definition").rglob("*.tmdl"):
+        for linea in ruta.read_text(encoding="utf-8").splitlines():
+            if linea.lstrip().startswith("//"):
+                errores.append(f"{ruta.name} tiene un comentario //, y TMDL no lo admite.")
+                break
     tablas = _tablas(modelo)
     if not tablas:
         errores.append("El TMDL no declara tablas.")
     if not any(t["medidas"] for t in tablas.values()):
         errores.append("El TMDL no declara medidas.")
-    if "relationship " not in (modelo / "definition" / "relationships.tmdl").read_text(encoding="utf-8"):
-        errores.append("No hay relaciones en relationships.tmdl.")
     for tabla, info in tablas.items():
         for medida, dax in info["medidas"]:
             if not _balance(_sin_comentarios(dax)):

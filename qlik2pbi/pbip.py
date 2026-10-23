@@ -90,7 +90,11 @@ def _modelo(modelo: Modelo, raiz: Path, nombre: str) -> None:
     (definicion / "database.tmdl").parent.mkdir(parents=True, exist_ok=True)
     (definicion / "database.tmdl").write_text("database\n\tcompatibilityLevel: 1600\n", encoding="utf-8")
     (definicion / "model.tmdl").write_text(_model_tmdl(modelo), encoding="utf-8")
-    (definicion / "relationships.tmdl").write_text(_relaciones_tmdl(modelo), encoding="utf-8")
+    ruta_rel = definicion / "relationships.tmdl"
+    if modelo.relaciones:
+        ruta_rel.write_text(_relaciones_tmdl(modelo), encoding="utf-8")
+    elif ruta_rel.exists():
+        ruta_rel.unlink()
     if modelo.usa_carpeta:
         (definicion / "expressions.tmdl").write_text(
             'expression CarpetaDatos = "datos" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=false]\n',
@@ -126,8 +130,6 @@ def _model_tmdl(modelo: Modelo) -> str:
 
 
 def _relaciones_tmdl(modelo: Modelo) -> str:
-    if not modelo.relaciones:
-        return "// Sin relaciones inferidas.\n"
     bloques: list[str] = []
     for relacion in modelo.relaciones:
         rid = ident(

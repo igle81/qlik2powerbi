@@ -84,6 +84,41 @@ def test_informe_lista_los_avisos_del_ejemplo():
     assert "Sum(Aggr" in texto or "Aggr" in texto
 
 
+def test_tablas_md_describe_origen_orden_y_power_query(tmp_path: Path):
+    codigo = main(
+        [
+            "--script",
+            str(EJEMPLO / "carga.qvs"),
+            "--export",
+            str(EJEMPLO / "app.json"),
+            "--out",
+            str(tmp_path),
+        ]
+    )
+    assert codigo == 0
+    texto = (tmp_path / "TABLAS.md").read_text(encoding="utf-8")
+    assert "Tablas que hay que importar" in texto
+    assert "CarpetaDatos" in texto
+    assert "lib://Datos/clientes.csv" in texto
+    assert "lib://Datos/historico.csv" in texto
+    assert "ApplyMap('MapaRegion')" in texto
+    assert "WHERE Cantidad > 0" in texto
+    assert "LEFT JOIN por PedidoID" in texto
+    assert "`historico.csv`" in texto
+    assert "CONCATENATE" in texto
+    assert "SELECT" in texto
+    assert "SERVIDOR" in texto
+    assert "PedidoID" in texto
+    assert "hechos" in texto
+    assert "dimensión" in texto
+    orden = [linea for linea in texto.splitlines() if linea[:2].rstrip(".").isdigit() and linea.startswith(tuple("123456789"))]
+    nombres = [linea.split("`")[1] for linea in orden]
+    assert nombres.index("MapaRegion") < nombres.index("Clientes")
+    assert nombres.index("VentasSQL") < nombres.index("Ventas")
+    assert nombres.index("Ventas") < nombres.index("Historico")
+    assert "TABLAS.md" in _arbol(tmp_path)
+
+
 def test_cli_regenera_el_mismo_proyecto(tmp_path: Path):
     codigo = main(
         [
