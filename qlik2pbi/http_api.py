@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -21,10 +23,32 @@ from qlik2pbi.acceso import (
 )
 from qlik2pbi.pagina import html_acceso, html_convertidor
 from qlik2pbi.pipeline import empaquetar, generar
+from qlik2pbi.script import decodificar_script
 
 LIMITE = 4 * 1024 * 1024
 _LIMITE_CODIGO = 8 * 1024
+_TOPE_ERROR = 2000
 _ROBOTS = b"User-agent: *\nDisallow: /\n"
+_MENSAJE_GENERICO = "No se ha podido generar el proyecto. Revisa el script y el .qvf."
+
+class _StderrActual(logging.StreamHandler):
+    """Escribe en el stderr vigente. Un StreamHandler fijo se queda en el de la importación."""
+
+    def __init__(self) -> None:
+        super().__init__(sys.stderr)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.stream = sys.stderr
+        super().emit(record)
+
+
+log = logging.getLogger("qlik2pbi.http")
+if not any(isinstance(handler, _StderrActual) for handler in log.handlers):
+    _salida = _StderrActual()
+    _salida.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    log.addHandler(_salida)
+    log.setLevel(logging.INFO)
+    log.propagate = False
 
 
 def procesar_peticion(method: str, path: str, headers, body: bytes) -> tuple[int, dict[str, str], bytes]:
@@ -106,28 +130,46 @@ def _convertir(headers, body: bytes) -> tuple[int, dict[str, str], bytes]:
     if len(script_bytes) > LIMITE or len(export_bytes) > LIMITE:
         return _json(413, {"error": "Cada fichero puede pesar como máximo 4 MB."})
     try:
-        script = script_bytes.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        script = script_bytes.decode("cp1252", errors="replace")
-    try:
+        script = decodificar_script(script_bytes)
         with tempfile.TemporaryDirectory(prefix="qlik2pbi-") as tmp:
             resultado = generar(script, export_bytes, export_nombre or "app.json", Path(tmp))
             paquete = empaquetar(resultado.carpeta)
             avisos = len(resultado.notas.avisos())
             nombre = resultado.nombre
     except ValueError as exc:
-        return _json(400, {"error": str(exc)})
-    except Exception:
-        return _json(
-            500,
-            {"error": "No se ha podido generar el proyecto. Revisa el script y el .qvf."},
-        )
+        return _json(400, {"error": _texto_error(exc)})
+    except RuntimeError as exc:
+        _registrar_fallo(exc, script_bytes, export_bytes, export_nombre)
+        return _json(400, {"error": _texto_error(exc)})
+    except Exception as exc:
+        _registrar_fallo(exc, script_bytes, export_bytes, export_nombre)
+        return _json(500, {"error": _texto_error(exc, prefijo=True)})
     return 200, {
         "Content-Type": "application/zip",
         "Content-Disposition": f'attachment; filename="{nombre}.zip"',
         "Cache-Control": "no-store",
         "X-Avisos": str(avisos),
     }, paquete
+
+
+def _registrar_fallo(_exc: BaseException, script: bytes, exportacion: bytes, nombre: str) -> None:
+    log.exception(
+        "Fallo al generar el proyecto (script=%s bytes, export=%s bytes, fichero=%s)",
+        len(script),
+        len(exportacion),
+        nombre or "",
+    )
+
+
+def _texto_error(exc: BaseException, prefijo: bool = False) -> str:
+    texto = str(exc).strip()
+    if not texto:
+        return _MENSAJE_GENERICO
+    if prefijo:
+        texto = f"No se ha podido generar el proyecto: {texto}"
+    if len(texto) > _TOPE_ERROR:
+        texto = texto[: _TOPE_ERROR - 1].rstrip() + "…"
+    return texto
 
 
 def _codigo_enviado(headers, body: bytes) -> str:

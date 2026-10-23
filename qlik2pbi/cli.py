@@ -8,6 +8,7 @@ from pathlib import Path
 
 from qlik2pbi import __version__
 from qlik2pbi.pipeline import empaquetar, generar
+from qlik2pbi.script import decodificar_script
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -40,10 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     if not export_path.is_file():
         print(f"No se encuentra la exportación: {export_path}", file=sys.stderr)
         return 2
-    try:
-        script = script_path.read_text(encoding="utf-8-sig")
-    except UnicodeDecodeError:
-        script = script_path.read_text(encoding="cp1252")
+    script = decodificar_script(script_path.read_bytes())
     try:
         resultado = generar(
             script,

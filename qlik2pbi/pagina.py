@@ -44,7 +44,7 @@ _ESTILO = """
       cursor: pointer;
     }
     button:disabled { opacity: 0.6; cursor: wait; }
-    #estado, .aviso { min-height: 1.4em; margin: 0; }
+    #estado, .aviso { min-height: 1.4em; margin: 0; white-space: pre-wrap; }
     .aviso { color: #8a2b1b; }
     footer { color: #5c564c; font-size: 0.92rem; line-height: 1.45; }
 """
@@ -134,11 +134,15 @@ def html_convertidor() -> str:
           datos.append("export", new Blob([sobre], {{ type: "application/json" }}), qvf.name + ".metadatos.json");
           const respuesta = await fetch("/api/convert", {{ method: "POST", body: datos }});
           if (!respuesta.ok) {{
-            let mensaje = "No se ha podido generar el proyecto.";
+            const texto = await respuesta.text();
+            let mensaje = "No se ha podido generar el proyecto (HTTP " + respuesta.status + ").";
             try {{
-              const cuerpo = await respuesta.json();
+              const cuerpo = JSON.parse(texto);
               if (cuerpo.error) mensaje = cuerpo.error;
-            }} catch (e) {{ /* el cuerpo no era JSON */ }}
+            }} catch (e) {{
+              const limpio = texto.replace(/<[^>]+>/g, " ").replace(/\\s+/g, " ").trim();
+              if (limpio) mensaje += " " + limpio.slice(0, 500);
+            }}
             throw new Error(mensaje);
           }}
           const blob = await respuesta.blob();

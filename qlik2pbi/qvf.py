@@ -195,39 +195,56 @@ def mapear(objetos: list, notas, nombre_fichero: str = ""):
     hojas_brutas: list[dict] = []
     for objeto in objetos:
         if not isinstance(objeto, dict):
+            notas.aviso(
+                "QVF",
+                "Hay objetos del .qvf que no son un diccionario. Se omiten y se sigue con el resto.",
+            )
             continue
-        script = _script_de(objeto)
-        if script and not exportacion.script:
-            exportacion.script = script
-        titulo = objeto.get("qTitle")
-        if isinstance(titulo, str) and titulo.strip() and "qLastReloadTime" in objeto:
-            exportacion.nombre = titulo.strip()
-        elif isinstance(titulo, str) and titulo.strip() and exportacion.nombre in {"", "Qlik"}:
-            exportacion.nombre = titulo.strip()
-        for variable in _variables(objeto):
-            if any(ya.nombre == variable.nombre for ya in exportacion.variables):
+        try:
+            script = _script_de(objeto)
+            if script and not exportacion.script:
+                exportacion.script = script
+            titulo = objeto.get("qTitle")
+            if isinstance(titulo, str) and titulo.strip() and "qLastReloadTime" in objeto:
+                exportacion.nombre = titulo.strip()
+            elif isinstance(titulo, str) and titulo.strip() and exportacion.nombre in {"", "Qlik"}:
+                exportacion.nombre = titulo.strip()
+            for variable in _variables(objeto):
+                if any(ya.nombre == variable.nombre for ya in exportacion.variables):
+                    continue
+                exportacion.variables.append(variable)
+            medida = _medida(objeto)
+            if medida:
+                ident, item = medida
+                medidas_por_id[ident or item.nombre] = item
                 continue
-            exportacion.variables.append(variable)
-        medida = _medida(objeto)
-        if medida:
-            ident, item = medida
-            medidas_por_id[ident or item.nombre] = item
-            continue
-        dimension = _dimension(objeto)
-        if dimension:
-            ident, campo = dimension
-            if ident:
-                dimensiones_por_id[ident] = campo
-            if campo and campo not in exportacion.dimensiones:
-                exportacion.dimensiones.append(campo)
-            continue
-        if _es_hoja(objeto):
-            hojas_brutas.append(objeto)
+            dimension = _dimension(objeto)
+            if dimension:
+                ident, campo = dimension
+                if ident:
+                    dimensiones_por_id[ident] = campo
+                if campo and campo not in exportacion.dimensiones:
+                    exportacion.dimensiones.append(campo)
+                continue
+            if _es_hoja(objeto):
+                hojas_brutas.append(objeto)
+        except Exception as exc:
+            notas.aviso(
+                "QVF",
+                f"No se ha podido leer un objeto del .qvf ({exc}). Se sigue con el resto.",
+            )
     for item in medidas_por_id.values():
         exportacion.medidas.append(item)
     biblioteca = _Biblioteca(medidas_por_id, dimensiones_por_id)
     for objeto in hojas_brutas:
-        hoja = _hoja(objeto, biblioteca, ExpHoja, ExpVisual)
+        try:
+            hoja = _hoja(objeto, biblioteca, ExpHoja, ExpVisual)
+        except Exception as exc:
+            notas.aviso(
+                "QVF",
+                f"No se ha podido leer un objeto del .qvf ({exc}). Se sigue con el resto.",
+            )
+            continue
         if hoja.visuales or hoja.titulo:
             exportacion.hojas.append(hoja)
     if exportacion.variables:

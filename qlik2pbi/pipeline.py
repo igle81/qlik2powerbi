@@ -77,6 +77,18 @@ def generar(script: str, exportacion: bytes, nombre_export: str, carpeta: Path, 
     resolver = _resolver(modelo)
     _medidas(modelo, datos, resolver, notas)
     _paginas(modelo, datos, resolver, notas)
+    if not modelo.relaciones:
+        notas.aviso(
+            "RELACION",
+            "No se han inferido relaciones. En Qlik las claves no siempre se llaman ID. "
+            "Revísalas en Power BI Desktop.",
+        )
+    tipos = {visual.tipo for pagina in modelo.paginas for visual in pagina.visuales}
+    if modelo.paginas and len(tipos) < 2:
+        notas.aviso(
+            "GRAFICO",
+            "El informe solo tiene un tipo de gráfico. Power BI lo abre igual.",
+        )
     proyecto = nombre or slug(modelo.nombre_app)
     carpeta = Path(carpeta)
     if carpeta.exists() and any(carpeta.iterdir()):
@@ -84,10 +96,16 @@ def generar(script: str, exportacion: bytes, nombre_export: str, carpeta: Path, 
         pass
     ruta = escribir_pbip(modelo, carpeta, proyecto)
     _informe(carpeta / "INFORME.md", modelo, notas, proyecto)
-    errores = validar_directorio(carpeta)
+    errores = [error for error in validar_directorio(carpeta) if error not in _ERRORES_REVISABLES]
     if errores:
         raise RuntimeError("El PBIP generado no supera la validación:\n- " + "\n- ".join(errores))
     return Resultado(carpeta, ruta, proyecto, notas, modelo)
+
+
+_ERRORES_REVISABLES = {
+    "No hay relaciones en relationships.tmdl.",
+    "El informe debería incluir más de un tipo de gráfico.",
+}
 
 
 def empaquetar(carpeta: Path) -> bytes:

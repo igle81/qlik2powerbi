@@ -61,6 +61,41 @@ class Carga:
     base: str = "BASEDATOS"
 
 
+def decodificar_script(data: bytes) -> str:
+    """Lee un .qvs tal como lo guarda Qlik: UTF-8, UTF-16 con BOM o Windows-1252."""
+    bruto = data or b""
+    texto: str | None = None
+    if bruto.startswith(b"\xff\xfe") or bruto.startswith(b"\xfe\xff"):
+        texto = _decodificar(bruto, "utf-16")
+    elif bruto.startswith(b"\xef\xbb\xbf"):
+        texto = _decodificar(bruto, "utf-8-sig")
+    elif _parece_utf16(bruto, impar=False):
+        texto = _decodificar(bruto, "utf-16-le")
+    elif _parece_utf16(bruto, impar=True):
+        texto = _decodificar(bruto, "utf-16-be")
+    if texto is None:
+        texto = _decodificar(bruto, "utf-8")
+    if texto is None:
+        texto = bruto.decode("cp1252")
+    return texto.replace("\x00", "").lstrip("\ufeff")
+
+
+def _decodificar(data: bytes, encoding: str) -> str | None:
+    try:
+        return data.decode(encoding)
+    except UnicodeError:
+        return None
+
+
+def _parece_utf16(data: bytes, impar: bool) -> bool:
+    if len(data) < 8 or len(data) % 2:
+        return False
+    muestra = data[:64]
+    pares = len(muestra) // 2
+    nulos = sum(1 for i in range(1 if not impar else 0, len(muestra), 2) if muestra[i] == 0)
+    return nulos >= max(4, pares // 2)
+
+
 def quitar_comentarios(texto: str) -> str:
     salida: list[str] = []
     i = 0
@@ -467,9 +502,16 @@ class Constructor:
         self._section_avisado = False
 
     def convertir(self, script: str) -> Modelo:
-        texto = quitar_comentarios(script.lstrip("\ufeff"))
+        texto = quitar_comentarios((script or "").replace("\x00", "").lstrip("\ufeff"))
         for sentencia in partir_sentencias(texto):
-            self._sentencia(sentencia)
+            try:
+                self._sentencia(sentencia)
+            except Exception as exc:
+                muestra = " ".join(sentencia.split())[:80]
+                self.notas.aviso(
+                    "SCRIPT",
+                    f"No se ha podido leer una sentencia ({exc}). Se sigue con el resto: {muestra}",
+                )
         if self.pendientes:
             self.notas.aviso("PRECEDING", "Hay un LOAD precedente sin origen. No se ha generado.")
         modelo = Modelo(usa_carpeta=self.usa_carpeta)
