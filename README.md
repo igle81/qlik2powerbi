@@ -20,10 +20,12 @@ El paquete `qlik2pbi/`, la web (`qlik2pbi/pagina.py`, `api/`) y el ejemplo de `e
 
 ## Qué hace la herramienta
 
-La entrada es:
+La entrada son solo dos ficheros:
 
-1. El script de carga (`.qvs` o el texto del script).
-2. La exportación de la app (JSON o XML de hojas y objetos, o un `.qvf` que sea un ZIP con ese JSON).
+1. El script de carga (`.qvs`).
+2. La app de Qlik Sense (`.qvf`).
+
+No hace falta exportar la app a JSON. El `.qvf` de Qlik Sense (formato de fichero 12000) se lee tal cual: la cabecera trae el formato y, a continuación, bloques `gzjson` con el script, las hojas, los objetos, las medidas maestras, las dimensiones maestras y las variables. Los bloques binarios, donde van las filas de las tablas y las imágenes, no se leen. Si un `.qvf` concreto está dañado y no se pueden leer esos bloques, el mensaje indica como último recurso exportarlo a JSON (`qlik app unbuild` en Qlik Cloud) y pasarlo por la línea de comandos junto al `.qvs`.
 
 La salida es una carpeta lista para abrir en Power BI Desktop:
 
@@ -55,14 +57,16 @@ Hace falta Python 3.10 o superior. No hay dependencias de pago.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-qlik2pbi --script carga.qvs --export app.json --out ./salida
+qlik2pbi --script carga.qvs --qvf app.qvf --out ./salida
 ```
 
 Sin instalar el paquete:
 
 ```bash
-python3 -m qlik2pbi --script carga.qvs --export app.json --out ./salida
+python3 -m qlik2pbi --script carga.qvs --qvf app.qvf --out ./salida
 ```
+
+`--export` es el mismo argumento que `--qvf`. Si ese `.qvf` está dañado, `--export` también acepta el JSON o el XML de un unbuild.
 
 `--zip` deja además `Nombre.zip` dentro de la carpeta de salida. `--nombre` fija el nombre del proyecto; si se omite, sale del título de la app.
 
@@ -70,7 +74,7 @@ Al abrir el PBIP, apunta el parámetro `CarpetaDatos` a la carpeta de los CSV. E
 
 ## Web
 
-La página está en español y pensada para [powerbi.avilesia.es](https://powerbi.avilesia.es) en Vercel. Antes de subir ficheros o descargar el ZIP pide un código de acceso. Los ficheros se leen en memoria, el PBIP se escribe en un directorio temporal que se borra al terminar y la respuesta lleva `Cache-Control: no-store`. No hay base de datos ni llamadas externas. Cada fichero puede pesar hasta 4 MB. Toda la web lleva `noindex` (`X-Robots-Tag`, meta robots y `public/robots.txt`).
+La página está en español y pensada para [powerbi.avilesia.es](https://powerbi.avilesia.es) en Vercel. Antes de subir ficheros o descargar el ZIP pide un código de acceso. Pide el `.qvs` y el `.qvf`, nada más. El navegador abre el `.qvf` en local, saca los bloques de metadatos y solo envía eso: hojas, objetos, medidas y dimensiones. Las filas de datos no salen del navegador. El `.qvs` puede pesar hasta 4 MB. Si los metadatos superan 4 MB, la página lo dice y la conversión se hace con la línea de comandos, que lee el `.qvf` entero en local sin ese tope. El PBIP se escribe en un directorio temporal que se borra al terminar y la respuesta lleva `Cache-Control: no-store`. No hay base de datos ni llamadas externas. Toda la web lleva `noindex` (`X-Robots-Tag`, meta robots y `public/robots.txt`).
 
 La línea de comandos no consulta estas variables. Solo las usa la web.
 
@@ -104,13 +108,13 @@ En local:
 ACCESS_CODE='un-codigo' SESSION_SECRET='un-secreto-largo' python3 -m qlik2pbi.serve
 ```
 
-Abre `http://127.0.0.1:8000`, entra con el código y después sube los dos ficheros.
+Abre `http://127.0.0.1:8000`, entra con el código y después sube el `.qvs` y el `.qvf`.
 
 En Vercel, el proyecto es la raíz del repositorio. `/` se reescribe a la función `api/app.py`. El código entra por `api/acceso.py` y la conversión por `api/convert.py`. Las tres usan la biblioteca estándar. `vercel.json` deja fuera del despliegue el código heredado y los ejemplos, y añade `noindex` a todas las rutas.
 
 ## Ejemplo
 
-`ejemplos/ventas/` es una librería inventada. No hay datos reales. El script carga un mapa de regiones, clientes, productos, ventas, un `SQL SELECT` sin `CONNECT`, un `LEFT JOIN`, un `RESIDENT` y un `CONCATENATE`. La exportación JSON tiene una hoja con tres KPI, una barra, una línea, una tarta, una tabla y dos filtros.
+`ejemplos/ventas/` es una librería inventada. No hay datos reales. El script carga un mapa de regiones, clientes, productos, ventas, un `SQL SELECT` sin `CONNECT`, un `LEFT JOIN`, un `RESIDENT` y un `CONCATENATE`. El JSON del ejemplo describe la misma hoja que traería un `.qvf`: tres KPI, una barra, una línea, una tarta, una tabla y dos filtros. Sirve para regenerar el PBIP del repositorio. Un `.qvf` real de Qlik Sense entra por el mismo camino.
 
 El PBIP ya generado está en `ejemplos/ventas/pbip` (`Ventas_demo`). Con el ejemplo salen 6 tablas, 6 relaciones, 8 medidas, 1 página y 9 gráficos. Tres avisos quedan a mano: el SQL sin servidor, una variable `$(vAnio)` y `Above`.
 
@@ -124,10 +128,10 @@ python3 -m qlik2pbi \
 ## Pruebas
 
 ```bash
-python3 -m pytest tests/test_qlik2pbi_ejemplo.py tests/test_qlik2pbi_acceso.py -q
+python3 -m pytest tests/test_qlik2pbi_ejemplo.py tests/test_qlik2pbi_acceso.py tests/test_qlik2pbi_qvf.py -q
 ```
 
-Comprueban que el TMDL y el `report.json` del ejemplo son válidos, que la CLI regenera el mismo árbol, que `GROUP BY` pasa a `Table.Group`, que una exportación XML también genera un PBIP, que la web devuelve el ZIP en memoria solo con la cookie de sesión, y que sin `ACCESS_CODE` no entra nadie.
+Comprueban que el TMDL y el `report.json` del ejemplo son válidos, que la CLI regenera el mismo árbol, que `GROUP BY` pasa a `Table.Group`, que una exportación XML también genera un PBIP, que un `.qvf` de Qlik Sense (el de ejemplo sintético y la app pública `qlik-dev-exec-dashboard`) se lee sin pasar por JSON, que la web devuelve el ZIP en memoria solo con la cookie de sesión, y que sin `ACCESS_CODE` no entra nadie.
 
 La batería heredada (`python3 -m pytest`) cubre el conversor anterior y no es necesaria para esta entrega.
 

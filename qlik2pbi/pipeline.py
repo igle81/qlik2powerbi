@@ -36,6 +36,9 @@ _TIPOS = {
     "pivot": "tableEx",
     "kpi": "card",
     "card": "card",
+    "gauge": "card",
+    "gaugechart": "card",
+    "bulletchart": "card",
     "filterpane": "slicer",
     "filter": "slicer",
     "listbox": "slicer",
@@ -60,12 +63,16 @@ def slug(nombre: str) -> str:
 
 def generar(script: str, exportacion: bytes, nombre_export: str, carpeta: Path, nombre: str | None = None) -> Resultado:
     notas = Notas()
+    datos = leer_exportacion(exportacion, nombre_export, notas)
+    if not (script or "").strip():
+        script = datos.script
+        if script.strip():
+            notas.info("SCRIPT", "El script de carga se ha leído del .qvf.")
     if not (script or "").strip():
         raise ValueError("El script de carga está vacío.")
     modelo, _ = analizar_script(script, notas)
     if not modelo.tablas:
         raise ValueError("El script no contiene ninguna tabla LOAD, SQL o INLINE.")
-    datos = leer_exportacion(exportacion, nombre_export, notas)
     modelo.nombre_app = datos.nombre or "Qlik"
     resolver = _resolver(modelo)
     _medidas(modelo, datos, resolver, notas)
@@ -253,6 +260,8 @@ def _medida_visual(modelo: Modelo, texto: str, titulo: str, resolver, notas: Not
 
 def _tipo(tipo: str, notas: Notas) -> str:
     clave = (tipo or "table").strip().lower()
+    if clave.startswith("sn-"):
+        clave = clave[3:]
     if clave in _TIPOS:
         if clave in {"pivot", "pivottable"}:
             notas.aviso("GRAFICO", "Una tabla dinámica se exporta como tabla plana.")

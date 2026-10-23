@@ -102,7 +102,7 @@ def _convertir(headers, body: bytes) -> tuple[int, dict[str, str], bytes]:
     _script_nombre, script_bytes = campos.get("script", ("", b""))
     export_nombre, export_bytes = campos.get("export", ("", b""))
     if not script_bytes or not export_bytes:
-        return _json(400, {"error": "Hay que subir el script de carga y la exportación de la app."})
+        return _json(400, {"error": "Hay que subir el script de carga (.qvs) y la app (.qvf)."})
     if len(script_bytes) > LIMITE or len(export_bytes) > LIMITE:
         return _json(413, {"error": "Cada fichero puede pesar como máximo 4 MB."})
     try:
@@ -120,7 +120,7 @@ def _convertir(headers, body: bytes) -> tuple[int, dict[str, str], bytes]:
     except Exception:
         return _json(
             500,
-            {"error": "No se ha podido generar el proyecto. Revisa el script y la exportación."},
+            {"error": "No se ha podido generar el proyecto. Revisa el script y el .qvf."},
         )
     return 200, {
         "Content-Type": "application/zip",

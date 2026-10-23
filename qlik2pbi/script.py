@@ -187,7 +187,9 @@ def _comas(texto: str) -> list[str]:
 def _sin_corchetes(texto: str) -> str:
     texto = texto.strip()
     if texto.startswith("[") and texto.endswith("]") and texto.count("[") == 1:
-        return texto[1:-1]
+        texto = texto[1:-1].strip()
+    if len(texto) >= 2 and texto[0] == texto[-1] == '"':
+        texto = texto[1:-1]
     return texto
 
 
@@ -873,7 +875,11 @@ def _tipo_inline(nombre: str, filas: list[list[str]], indice: int) -> tuple[str,
 
 
 def _es_hecho(tabla: Tabla) -> bool:
-    return any(c.nombre.lower() in _HECHOS for c in tabla.columnas)
+    if any(c.nombre.lower() in _HECHOS for c in tabla.columnas):
+        return True
+    # Qlik nombra la tabla de hechos Fact, FactTable, Facts… «Factura» no entra aquí.
+    tokens = re.findall(r"[a-z0-9]+", tabla.nombre.lower())
+    return any(token == "fact" or (token.startswith("fact") and not token.startswith("factura")) for token in tokens)
 
 
 def _etiqueta(texto: str) -> tuple[str, str]:
@@ -1062,8 +1068,14 @@ def _from(texto: str) -> tuple[str, str]:
 
 
 def _es_clave(nombre: str) -> bool:
-    clave = nombre.lower()
-    return clave == "id" or clave.endswith("id") or clave.endswith("_key")
+    original = nombre.strip().strip('"').strip("[]")
+    clave = original.lower()
+    if clave == "id" or clave.endswith("id") or clave.endswith("_key"):
+        return True
+    # CustKey, MonthlyRegionKey, Item-Branch Key, CustKeyAR.
+    separado = re.sub(r"([A-Za-z])([A-Z])", r"\1 \2", original)
+    tokens = [token.lower() for token in re.findall(r"[A-Za-z0-9]+", separado)]
+    return "key" in tokens or "id" in tokens
 
 
 def _relaciones(tablas: list[Tabla], notas: Notas) -> list[Relacion]:

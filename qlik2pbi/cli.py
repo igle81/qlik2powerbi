@@ -1,4 +1,4 @@
-"""Línea de comandos: qlik2pbi --script carga.qvs --export app.json --out ./salida"""
+"""Línea de comandos: qlik2pbi --script carga.qvs --qvf app.qvf --out ./salida"""
 
 from __future__ import annotations
 
@@ -14,12 +14,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="qlik2pbi",
         description=(
-            "Genera un proyecto de Power BI (PBIP) a partir del script de carga de Qlik "
-            "y de la exportación de hojas y objetos. Todo ocurre en local."
+            "Genera un proyecto de Power BI (PBIP) a partir del script de carga "
+            "y de la app .qvf de Qlik Sense. Todo ocurre en local."
         ),
     )
-    parser.add_argument("--script", required=True, help="Script de carga (.qvs o texto).")
-    parser.add_argument("--export", required=True, help="Exportación de la app (.json, .xml o .qvf).")
+    parser.add_argument("--script", required=True, help="Script de carga (.qvs).")
+    parser.add_argument(
+        "--export",
+        "--qvf",
+        required=True,
+        dest="export",
+        help="App de Qlik Sense (.qvf). Si ese .qvf está dañado, se puede pasar el JSON de un unbuild.",
+    )
     parser.add_argument("--out", required=True, help="Carpeta de salida del PBIP.")
     parser.add_argument("--nombre", help="Nombre del proyecto. Por defecto sale del título de la app.")
     parser.add_argument("--zip", action="store_true", help="Escribe también un ZIP del PBIP dentro de la carpeta de salida.")
