@@ -602,7 +602,7 @@ class Constructor:
             )
 
     def _nueva_tabla(self, carga: Carga) -> None:
-        nombre = self._nombre_libre(carga.etiqueta or _nombre_por_defecto(carga))
+        nombre = self._nombre_libre(_nombre_de_carga(carga))
         pasos, columnas = self._pasos_de_carga(carga, None)
         if carga.mapeo:
             self.notas.info("APPLYMAP", f"Tabla de mapeo «{nombre}» lista para ApplyMap. Queda oculta en el modelo.")
@@ -722,7 +722,7 @@ class Constructor:
                     "Hay un SQL SELECT sin CONNECT con servidor y base de datos. "
                     f"La consulta usa el marcador {carga.servidor} / {carga.base}. Cámbialo antes de actualizar.",
                 )
-            sql = re.sub(r"\s+", " ", carga.sql).strip()
+            sql = re.sub(r"\s+", " ", _limpiar_comentarios_sql(carga.sql)).strip()
             _add(
                 pasos,
                 "Origen",
@@ -974,10 +974,14 @@ def _ficha(carga: Carga) -> FichaTabla:
             depende_de=[carga.residente] if carga.residente else [],
         )
     elif carga.fuente == "sql":
-        sql = re.sub(r"\s+", " ", carga.sql).strip()
+        sql = re.sub(r"\s+", " ", _limpiar_comentarios_sql(carga.sql)).strip()
+        _tabla, cualificado = _desde_from(carga.sql)
+        texto = f"Conexión SQL {carga.servidor} / {carga.base}."
+        if cualificado:
+            texto += f" Tabla de origen `{cualificado}`."
         ficha = FichaTabla(
             "sql",
-            f"Conexión SQL {carga.servidor} / {carga.base}.",
+            texto,
             servidor=carga.servidor,
             base=carga.base,
             sql=sql,
@@ -1039,6 +1043,16 @@ def _anotar_carga(tabla: Tabla, carga: Carga, prefijo: str) -> None:
             tabla.ficha.ficheros.append(item)
 
 
+def _nombre_de_carga(carga: Carga) -> str:
+    if carga.fuente == "sql":
+        etiqueta = _sanear_nombre_tmdl(carga.etiqueta) if carga.etiqueta else ""
+        if etiqueta:
+            return etiqueta
+        tabla, _cualificado = _desde_from(carga.sql)
+        return _sanear_nombre_tmdl(tabla) or "ConsultaSQL"
+    return carga.etiqueta or _nombre_por_defecto(carga)
+
+
 def _nombre_por_defecto(carga: Carga) -> str:
     if carga.fuente in {"csv", "xlsx", "qvd"} and carga.ruta:
         base = _nombre_fichero(carga.ruta)
@@ -1047,8 +1061,143 @@ def _nombre_por_defecto(carga: Carga) -> str:
     if carga.fuente == "resident":
         return f"{carga.residente}_resident"
     if carga.fuente == "sql":
-        return "ConsultaSQL"
+        tabla, _cualificado = _desde_from(carga.sql)
+        return _sanear_nombre_tmdl(tabla) or "ConsultaSQL"
     return "Tabla"
+
+
+def _sanear_nombre_tmdl(nombre: str) -> str:
+    texto = re.sub(r"[^\w]+", "_", (nombre or "").strip(), flags=re.UNICODE)
+    texto = re.sub(r"_+", "_", texto).strip("_")
+    if texto[:1].isdigit():
+        texto = "T_" + texto
+    return texto[:120]
+
+
+def _desde_from(sql: str) -> tuple[str, str]:
+    """Primera tabla del FROM: (nombre sin esquema, nombre cualificado)."""
+    texto = _limpiar_comentarios_sql(sql or "")
+    i = 0
+    n = len(texto)
+    profundidad = 0
+    en_cadena = None
+    while i < n:
+        ch = texto[i]
+        if en_cadena:
+            if ch == en_cadena:
+                if en_cadena in "'\"" and i + 1 < n and texto[i + 1] == en_cadena:
+                    i += 2
+                    continue
+                en_cadena = None
+            i += 1
+            continue
+        if ch in "'\"":
+            en_cadena = ch
+            i += 1
+            continue
+        if ch == "(":
+            profundidad += 1
+            i += 1
+            continue
+        if ch == ")":
+            profundidad = max(0, profundidad - 1)
+            i += 1
+            continue
+        if profundidad == 0 and texto[i : i + 4].lower() == "from" and _borde_palabra(texto, i, 4):
+            partes = _identificador_sql(texto[i + 4 :])
+            if partes:
+                return partes[-1], ".".join(partes)
+            return "", ""
+        i += 1
+    return "", ""
+
+
+def _borde_palabra(texto: str, inicio: int, largo: int) -> bool:
+    antes = inicio == 0 or not (texto[inicio - 1].isalnum() or texto[inicio - 1] == "_")
+    fin = inicio + largo
+    despues = fin >= len(texto) or not (texto[fin].isalnum() or texto[fin] == "_")
+    return antes and despues
+
+
+def _identificador_sql(texto: str) -> list[str]:
+    i = 0
+    n = len(texto)
+    partes: list[str] = []
+    while True:
+        while i < n and texto[i].isspace():
+            i += 1
+        if i >= n:
+            break
+        if texto[i] == "[":
+            fin = texto.find("]", i + 1)
+            if fin < 0:
+                break
+            partes.append(texto[i + 1 : fin].replace("]]", "]").strip())
+            i = fin + 1
+        elif texto[i] in "'\"":
+            cita = texto[i]
+            j = i + 1
+            buf: list[str] = []
+            while j < n:
+                if texto[j] == cita:
+                    if j + 1 < n and texto[j + 1] == cita:
+                        buf.append(cita)
+                        j += 2
+                        continue
+                    break
+                buf.append(texto[j])
+                j += 1
+            partes.append("".join(buf).strip())
+            i = j + 1 if j < n else n
+        else:
+            match = re.match(r"[\w]+", texto[i:], re.UNICODE)
+            if not match:
+                break
+            partes.append(match.group(0))
+            i += len(match.group(0))
+        while i < n and texto[i].isspace():
+            i += 1
+        if i < n and texto[i] == ".":
+            i += 1
+            continue
+        break
+    return [parte for parte in partes if parte]
+
+
+def _limpiar_comentarios_sql(sql: str) -> str:
+    salida: list[str] = []
+    i = 0
+    n = len(sql)
+    en_cadena = None
+    while i < n:
+        if en_cadena:
+            salida.append(sql[i])
+            if sql[i] == en_cadena:
+                if en_cadena in "'\"" and i + 1 < n and sql[i + 1] == en_cadena:
+                    salida.append(sql[i + 1])
+                    i += 2
+                    continue
+                en_cadena = None
+            i += 1
+            continue
+        if sql[i] in "'\"":
+            en_cadena = sql[i]
+            salida.append(sql[i])
+            i += 1
+            continue
+        if sql.startswith("--", i):
+            while i < n and sql[i] not in "\r\n":
+                i += 1
+            salida.append(" ")
+            continue
+        if sql.startswith("/*", i):
+            fin = sql.find("*/", i + 2)
+            i = n if fin < 0 else fin + 2
+            salida.append(" ")
+            continue
+        salida.append(sql[i])
+        i += 1
+    return "".join(salida)
 
 
 def _parse_carga(texto: str, etiqueta: str, notas: Notas, conexion: tuple[str, str, bool]) -> Carga | None:
