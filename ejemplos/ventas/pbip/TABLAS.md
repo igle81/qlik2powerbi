@@ -93,7 +93,7 @@ Estas son las tablas del script de carga. El PBIP no incluye las filas: en Power
 
 - Nombre en Power BI: `VentasSQL`
 - Papel: dimensión
-- Origen: Conexión SQL SERVIDOR / BASEDATOS.
+- Origen: Conexión SQL SERVIDOR / BASEDATOS. Tabla de origen `dbo.Pedidos`.
 - Consulta: `SELECT PedidoID, Estado FROM dbo.Pedidos WHERE Estado <> 'Anulado'`
 - Campos:
   - `PedidoID` — número entero

@@ -108,6 +108,7 @@ def test_tablas_md_describe_origen_orden_y_power_query(tmp_path: Path):
     assert "CONCATENATE" in texto
     assert "SELECT" in texto
     assert "SERVIDOR" in texto
+    assert "`dbo.Pedidos`" in texto
     assert "PedidoID" in texto
     assert "hechos" in texto
     assert "dimensión" in texto
