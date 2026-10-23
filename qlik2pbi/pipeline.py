@@ -16,6 +16,7 @@ from qlik2pbi.modelo import Medida, Modelo, Pagina, Proyeccion, Visual
 from qlik2pbi.notas import Notas
 from qlik2pbi.pbip import escribir_pbip
 from qlik2pbi.script import analizar_script
+from qlik2pbi.tablas import documento_tablas
 from qlik2pbi.validar import validar_directorio
 
 _TIPOS = {
@@ -96,6 +97,7 @@ def generar(script: str, exportacion: bytes, nombre_export: str, carpeta: Path, 
         pass
     ruta = escribir_pbip(modelo, carpeta, proyecto)
     _informe(carpeta / "INFORME.md", modelo, notas, proyecto)
+    (carpeta / "TABLAS.md").write_text(documento_tablas(modelo), encoding="utf-8")
     errores = [error for error in validar_directorio(carpeta) if error not in _ERRORES_REVISABLES]
     if errores:
         raise RuntimeError("El PBIP generado no supera la validación:\n- " + "\n- ".join(errores))

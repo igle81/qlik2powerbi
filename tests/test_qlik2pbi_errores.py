@@ -192,6 +192,44 @@ def test_una_excepcion_vacia_conserva_el_texto_generico(monkeypatch: pytest.Monk
     assert json.loads(carga)["error"] == "No se ha podido generar el proyecto. Revisa el script y el .qvf."
 
 
+def test_ningun_tmdl_empieza_por_barra_barra(tmp_path):
+    from pathlib import Path
+
+    ejemplo = Path(__file__).resolve().parents[1] / "ejemplos" / "ventas" / "pbip"
+    generar(SCRIPT, XML.encode(), "app.xml", tmp_path)
+    rutas = list(ejemplo.rglob("*.tmdl")) + list(tmp_path.rglob("*.tmdl"))
+    assert rutas
+    for ruta in rutas:
+        for linea in ruta.read_text(encoding="utf-8").splitlines():
+            assert not linea.lstrip().startswith("//"), f"{ruta}: {linea}"
+
+
+def test_app_de_una_sola_tabla_abre_sin_comentario_tmdl(tmp_path):
+    resultado = generar(SCRIPT, XML.encode(), "Visados.xml", tmp_path)
+    assert len([tabla for tabla in resultado.modelo.tablas if not tabla.mapeo]) == 1
+    modelo = tmp_path / "Visados.SemanticModel"
+    assert not (modelo / "definition" / "relationships.tmdl").exists()
+    database = (modelo / "definition" / "database.tmdl").read_text(encoding="utf-8")
+    assert database.startswith("database")
+    assert "compatibilityLevel:" in database
+    model_tmdl = (modelo / "definition" / "model.tmdl").read_text(encoding="utf-8")
+    assert model_tmdl.startswith("model ")
+    assert "ref table Visados" in model_tmdl
+    assert (modelo / "definition" / "tables" / "Visados.tmdl").is_file()
+    pbir = (tmp_path / "Visados.Report" / "definition.pbir").read_text(encoding="utf-8")
+    assert "byPath" in pbir
+    assert "Visados.SemanticModel" in pbir
+    informe = (tmp_path / "INFORME.md").read_text(encoding="utf-8")
+    assert "No se han inferido relaciones" in informe
+    for ruta in modelo.rglob("*.tmdl"):
+        assert "Sin relaciones" not in ruta.read_text(encoding="utf-8")
+        assert "inferidas" not in ruta.read_text(encoding="utf-8")
+    tablas = (tmp_path / "TABLAS.md").read_text(encoding="utf-8")
+    assert "Visados" in tablas
+    assert "INLINE" in tablas
+    assert "hechos" in tablas
+
+
 def test_la_pagina_muestra_el_error_en_varias_lineas():
     texto = html_convertidor()
     assert "white-space: pre-wrap" in texto

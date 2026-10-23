@@ -13,6 +13,22 @@ class Columna:
 
 
 @dataclass
+class FichaTabla:
+    """De dónde sale la tabla en el script, para explicarlo en TABLAS.md."""
+
+    clase: str = "desconocido"
+    texto: str = "Origen no registrado en el script."
+    ruta: str = ""
+    fichero: str = ""
+    servidor: str = ""
+    base: str = ""
+    sql: str = ""
+    transformaciones: list[str] = field(default_factory=list)
+    depende_de: list[str] = field(default_factory=list)
+    ficheros: list[tuple[str, str, str]] = field(default_factory=list)
+
+
+@dataclass
 class Tabla:
     nombre: str
     columnas: list[Columna]
@@ -20,6 +36,7 @@ class Tabla:
     oculta: bool = False
     mapeo: bool = False
     hecho: bool = False
+    ficha: FichaTabla = field(default_factory=FichaTabla)
 
     def m(self) -> str:
         return render_let(self.pasos)

@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 
 from qlik2pbi.mexpr import a_m, m_ident, m_texto, referencias
-from qlik2pbi.modelo import Columna, Modelo, Relacion, Tabla, render_let
+from qlik2pbi.modelo import Columna, FichaTabla, Modelo, Relacion, Tabla, render_let
 from qlik2pbi.notas import Notas
 
 _HECHOS = {
@@ -612,13 +612,18 @@ class Constructor:
             pasos=pasos,
             oculta=carga.mapeo,
             mapeo=carga.mapeo,
+            ficha=_ficha(carga),
         )
         self.tablas[nombre] = tabla
         self.orden.append(nombre)
         self._aplicar_precedentes(tabla)
 
     def _aplicar_precedentes(self, tabla: Tabla) -> None:
+        if self.pendientes:
+            tabla.ficha.transformaciones.append("Hay un LOAD precedente sobre este origen.")
         for previo in self.pendientes:
+            if previo.donde:
+                tabla.ficha.transformaciones.append(f"WHERE del LOAD precedente: {previo.donde}.")
             pasos, columnas = self._transformar(tabla.pasos, tabla.columnas, previo.campos, previo.donde, previo.agrupar)
             tabla.pasos = pasos
             tabla.columnas = columnas
@@ -661,6 +666,7 @@ class Constructor:
         else:
             _add(tabla.pasos, "QuitarUnion", f'Table.RemoveColumns({m_ident(unido)}, {{"union_qlik"}})')
         self.notas.info("JOIN", f"{tipo} JOIN combinado en «{destino}» por {', '.join(claves)}.")
+        _anotar_carga(tabla, carga, f"{tipo} JOIN por {', '.join(claves)} con ")
 
     def _concatenar(self, carga: Carga) -> None:
         destino = carga.concatenar or ""
@@ -682,6 +688,7 @@ class Constructor:
             if columna.nombre.lower() not in conocidos:
                 tabla.columnas.append(columna)
         self.notas.info("CONCAT", f"CONCATENATE añadido a «{destino}» con Table.Combine.")
+        _anotar_carga(tabla, carga, "CONCATENATE de ")
 
     def _nombre_libre(self, base: str) -> str:
         base = re.sub(r"\s+", " ", (base or "Tabla").strip()) or "Tabla"
@@ -955,6 +962,81 @@ def _leer_conexion(texto: str, notas: Notas) -> tuple[str, str, bool]:
         return servidor, base, True
     notas.aviso("SQL", "Hay un CONNECT, pero no se han podido leer el servidor y la base de datos.")
     return "SERVIDOR", "BASEDATOS", False
+
+
+def _ficha(carga: Carga) -> FichaTabla:
+    if carga.fuente == "inline":
+        ficha = FichaTabla("inline", "Datos INLINE escritos en el script.")
+    elif carga.fuente == "resident":
+        ficha = FichaTabla(
+            "resident",
+            f"RESIDENT {carga.residente}.",
+            depende_de=[carga.residente] if carga.residente else [],
+        )
+    elif carga.fuente == "sql":
+        sql = re.sub(r"\s+", " ", carga.sql).strip()
+        ficha = FichaTabla(
+            "sql",
+            f"Conexión SQL {carga.servidor} / {carga.base}.",
+            servidor=carga.servidor,
+            base=carga.base,
+            sql=sql,
+        )
+    elif carga.fuente == "qvd":
+        fichero = re.sub(r"(?i)\.qvd$", ".csv", _nombre_fichero(carga.ruta))
+        ficha = FichaTabla(
+            "qvd",
+            f"QVD `{carga.ruta}`. Power Query no lee QVD: la consulta espera `{fichero}` dentro de CarpetaDatos.",
+            ruta=carga.ruta,
+            fichero=fichero,
+            ficheros=[(fichero, carga.ruta, "qvd")],
+        )
+    elif carga.fuente == "xlsx":
+        fichero = _nombre_fichero(carga.ruta)
+        ficha = FichaTabla(
+            "xlsx",
+            f"Excel `{carga.ruta}`, hoja {carga.hoja}. En Power Query se lee CarpetaDatos & \"/{fichero}\".",
+            ruta=carga.ruta,
+            fichero=fichero,
+            ficheros=[(fichero, carga.ruta, "xlsx")],
+        )
+    elif carga.fuente == "csv":
+        fichero = _nombre_fichero(carga.ruta)
+        ficha = FichaTabla(
+            "csv",
+            f"CSV `{carga.ruta}`. En Power Query se lee CarpetaDatos & \"/{fichero}\".",
+            ruta=carga.ruta,
+            fichero=fichero,
+            ficheros=[(fichero, carga.ruta, "csv")],
+        )
+    else:
+        ficha = FichaTabla()
+    if carga.donde:
+        ficha.transformaciones.append(f"WHERE {carga.donde}.")
+    for campo in carga.campos:
+        if campo.clase != "applymap":
+            continue
+        defecto = f", con defecto {campo.defecto}" if campo.defecto else ""
+        ficha.transformaciones.append(
+            f"ApplyMap('{campo.mapa}') de {campo.clave_mapa} a {campo.alias}{defecto}."
+        )
+        if campo.mapa and campo.mapa not in ficha.depende_de:
+            ficha.depende_de.append(campo.mapa)
+    return ficha
+
+
+def _anotar_carga(tabla: Tabla, carga: Carga, prefijo: str) -> None:
+    ficha = _ficha(carga)
+    tabla.ficha.transformaciones.append(prefijo + ficha.texto)
+    for nota in ficha.transformaciones:
+        if nota not in tabla.ficha.transformaciones:
+            tabla.ficha.transformaciones.append(nota)
+    for dependencia in ficha.depende_de:
+        if dependencia and dependencia != tabla.nombre and dependencia not in tabla.ficha.depende_de:
+            tabla.ficha.depende_de.append(dependencia)
+    for item in ficha.ficheros:
+        if item not in tabla.ficha.ficheros:
+            tabla.ficha.ficheros.append(item)
 
 
 def _nombre_por_defecto(carga: Carga) -> str:
