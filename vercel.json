@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/", "destination": "/api/app" },
+    { "source": "/index.html", "destination": "/api/app" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ],
+  "functions": {
+    "api/**/*.py": {
+      "excludeFiles": "{output,artifacts,docs,tools,qlik_export,powerbi_import,src,tests,examples,ejemplos,.git,.github}/**"
+    }
+  }
+}

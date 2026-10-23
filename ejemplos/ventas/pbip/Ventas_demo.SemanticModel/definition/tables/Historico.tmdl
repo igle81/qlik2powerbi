@@ -1,0 +1,101 @@
+table Historico
+	lineageTag: 14ad3306-6e8e-5ff5-9f0b-6b8cf0da6926
+
+	column PedidoID
+		dataType: int64
+		lineageTag: e3c90b2e-78b5-5789-bc17-fc8e79c8b7f5
+		summarizeBy: none
+		sourceColumn: PedidoID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Fecha
+		dataType: dateTime
+		lineageTag: 79360344-58df-5ba6-acb1-1bdf2cc17012
+		summarizeBy: none
+		sourceColumn: Fecha
+
+		annotation SummarizationSetBy = Automatic
+
+	column Anio
+		dataType: int64
+		lineageTag: 905bba47-677c-505b-bc0a-badca6b993ec
+		summarizeBy: none
+		sourceColumn: Anio
+
+		annotation SummarizationSetBy = Automatic
+
+	column Mes
+		dataType: int64
+		lineageTag: b2f34de8-0a73-5f9e-9377-79903fce7f2c
+		summarizeBy: none
+		sourceColumn: Mes
+
+		annotation SummarizationSetBy = Automatic
+
+	column ClienteID
+		dataType: int64
+		lineageTag: f1729f9d-b50c-5f5e-b908-4e04a990124d
+		summarizeBy: none
+		sourceColumn: ClienteID
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductoID
+		dataType: int64
+		lineageTag: cc8b896b-65f8-504b-bd69-665e56a066f0
+		summarizeBy: none
+		sourceColumn: ProductoID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cantidad
+		dataType: int64
+		lineageTag: 749287c5-0d07-5bf0-8fc0-9af2763c3cc3
+		summarizeBy: sum
+		sourceColumn: Cantidad
+
+		annotation SummarizationSetBy = Automatic
+
+	column Importe
+		dataType: double
+		lineageTag: 1efc7bf0-8bbb-5c97-aca8-a3c48a817b6b
+		summarizeBy: sum
+		sourceColumn: Importe
+
+		annotation SummarizationSetBy = Automatic
+
+	column Segmento
+		dataType: string
+		lineageTag: 9e726828-6668-55b0-814e-1a94dcfccff3
+		summarizeBy: none
+		sourceColumn: Segmento
+
+		annotation SummarizationSetBy = Automatic
+
+	column Estado
+		dataType: string
+		lineageTag: a3415563-68a0-50cf-8e8c-39d3e5a8ac4d
+		summarizeBy: none
+		sourceColumn: Estado
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Historico = m
+		mode: import
+		source =
+			let
+			    Origen = Ventas,
+			    Concatenar = Table.Combine({Origen, (
+			    let
+			        Origen = Csv.Document(File.Contents(CarpetaDatos & "/historico.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			        Encabezados = Table.PromoteHeaders(Origen, [PromoteAllScalars=true]),
+			        Tipos = Table.TransformColumnTypes(Encabezados, {{"PedidoID", Int64.Type}, {"Fecha", type date}, {"Anio", Int64.Type}, {"Mes", Int64.Type}, {"ClienteID", Int64.Type}, {"ProductoID", Int64.Type}, {"Cantidad", Int64.Type}, {"Importe", type number}, {"Segmento", type text}}),
+			        Seleccionar = Table.SelectColumns(Tipos, {"PedidoID", "Fecha", "Anio", "Mes", "ClienteID", "ProductoID", "Cantidad", "Importe", "Segmento"})
+			    in
+			        Seleccionar
+			    )})
+			in
+			    Concatenar
+
+	annotation PBI_ResultType = Table

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "809a6f510f245cdb91f4",
+  "position": {
+    "x": 16,
+    "y": 16,
+    "z": 0,
+    "height": 120,
+    "width": 336,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "card",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Ventas"
+                    }
+                  },
+                  "Property": "Importe total"
+                }
+              },
+              "queryRef": "Ventas.Importe total",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Importe total'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

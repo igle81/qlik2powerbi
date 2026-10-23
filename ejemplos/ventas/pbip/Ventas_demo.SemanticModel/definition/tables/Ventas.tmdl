@@ -1,0 +1,147 @@
+table Ventas
+	lineageTag: b88d11b6-67e4-5dad-a0f0-83a3bb3c237e
+
+	measure 'Importe total' = SUM('Ventas'[Importe])
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: bcc2dc62-656e-5b60-9789-687106136753
+
+	measure Pedidos = DISTINCTCOUNT('Ventas'[PedidoID])
+		formatString: #,0
+		displayFolder: Medidas
+		lineageTag: 80550c45-b2df-5ace-8175-8e1f239cf696
+
+	measure 'Importe 2024' = CALCULATE(SUM('Ventas'[Importe]), 'Ventas'[Anio] = 2024)
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: a263a615-4303-5a94-9c13-f9b91f89a82c
+
+	measure 'Ticket medio' = IF(DISTINCTCOUNT('Ventas'[PedidoID]) > 0, SUM('Ventas'[Importe]) / DISTINCTCOUNT('Ventas'[PedidoID]), 0)
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: 1eec60e6-ffce-5b05-872b-ca9a5060437e
+
+	measure 'Importe por cliente' = SUMX(VALUES('Clientes'[Cliente]), CALCULATE(SUM('Ventas'[Importe])))
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: 5ff12816-2b0a-5714-a12a-87c94cfd6f95
+
+	measure 'Importe sin año' = CALCULATE(SUM('Ventas'[Importe]), REMOVEFILTERS('Ventas'[Anio]))
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: 3ad5359a-2d16-52cd-a001-b8aea273de2c
+
+	measure 'Importe del variable' = SUM('Ventas'[Importe])
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: 1b35fe71-528d-5e35-9cd6-142828e57013
+
+	measure 'Mes anterior' = /* REVISAR: Above(Sum(Importe)) */ BLANK()
+		formatString: #,0.00
+		displayFolder: Medidas
+		lineageTag: 78ba6248-6b23-535e-9333-d5bba6d521bb
+
+	column PedidoID
+		dataType: int64
+		lineageTag: e455c48d-3a0f-5154-bd18-61f80cb45e83
+		summarizeBy: none
+		sourceColumn: PedidoID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Fecha
+		dataType: dateTime
+		lineageTag: f3b522f5-229a-5bb7-9dab-371d0ea531cf
+		summarizeBy: none
+		sourceColumn: Fecha
+
+		annotation SummarizationSetBy = Automatic
+
+	column Anio
+		dataType: int64
+		lineageTag: 2e6111a3-2c79-5419-bac8-c9910333af56
+		summarizeBy: none
+		sourceColumn: Anio
+
+		annotation SummarizationSetBy = Automatic
+
+	column Mes
+		dataType: int64
+		lineageTag: 7a2d97df-49c2-5042-8bde-eb9b6b73d1f6
+		summarizeBy: none
+		sourceColumn: Mes
+
+		annotation SummarizationSetBy = Automatic
+
+	column ClienteID
+		dataType: int64
+		lineageTag: 8f771c7e-a216-5566-833a-5eb0ee2eff3e
+		summarizeBy: none
+		sourceColumn: ClienteID
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductoID
+		dataType: int64
+		lineageTag: 0bc473c6-ccd4-56ac-b737-fff0f1d8a4d2
+		summarizeBy: none
+		sourceColumn: ProductoID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cantidad
+		dataType: int64
+		lineageTag: 9643f0e1-9375-5ab4-bafc-c8a917b2587e
+		summarizeBy: sum
+		sourceColumn: Cantidad
+
+		annotation SummarizationSetBy = Automatic
+
+	column Importe
+		dataType: double
+		lineageTag: 6948905b-c365-5402-98dd-0fd4c155c252
+		summarizeBy: sum
+		sourceColumn: Importe
+
+		annotation SummarizationSetBy = Automatic
+
+	column Segmento
+		dataType: string
+		lineageTag: 18727531-d43e-56ca-9cfd-535429f41bec
+		summarizeBy: none
+		sourceColumn: Segmento
+
+		annotation SummarizationSetBy = Automatic
+
+	column Estado
+		dataType: string
+		lineageTag: 85d4dd60-e712-5494-bb69-169b7fb41bc1
+		summarizeBy: none
+		sourceColumn: Estado
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Ventas = m
+		mode: import
+		source =
+			let
+			    Origen = Csv.Document(File.Contents(CarpetaDatos & "/ventas.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Encabezados = Table.PromoteHeaders(Origen, [PromoteAllScalars=true]),
+			    Tipos = Table.TransformColumnTypes(Encabezados, {{"PedidoID", Int64.Type}, {"Fecha", type date}, {"ClienteID", Int64.Type}, {"ProductoID", Int64.Type}, {"Cantidad", Int64.Type}, {"Importe", type number}, {"Alto", type text}, {"Normal", type text}}),
+			    Filtrar = Table.SelectRows(Tipos, each [Cantidad] > 0),
+			    Calcular = Table.AddColumn(Filtrar, "Anio", each Date.Year([Fecha]), Int64.Type),
+			    Calcular2 = Table.AddColumn(Calcular, "Mes", each Date.Month([Fecha]), Int64.Type),
+			    Calcular3 = Table.AddColumn(Calcular2, "Segmento", each if [Importe] > 1000 then "Alto" else "Normal", type text),
+			    Seleccionar = Table.SelectColumns(Calcular3, {"PedidoID", "Fecha", "Anio", "Mes", "ClienteID", "ProductoID", "Cantidad", "Importe", "Segmento"}),
+			    Unir = Table.NestedJoin(Seleccionar, {"PedidoID"}, (
+			    let
+			        Origen = VentasSQL,
+			        Seleccionar = Table.SelectColumns(Origen, {"PedidoID", "Estado"})
+			    in
+			        Seleccionar
+			    ), {"PedidoID"}, "union_qlik", JoinKind.LeftOuter),
+			    ExpandirUnion = Table.ExpandTableColumn(Unir, "union_qlik", {"Estado"}, {"Estado"})
+			in
+			    ExpandirUnion
+
+	annotation PBI_ResultType = Table

@@ -1,0 +1,16 @@
+"""GET / en Vercel, reescrito desde la raíz. Sirve la página con o sin sesión."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_RAIZ = Path(__file__).resolve().parents[1]
+if str(_RAIZ) not in sys.path:
+    sys.path.insert(0, str(_RAIZ))
+
+from qlik2pbi.http_api import handler as _Handler  # noqa: E402
+
+
+class handler(_Handler):
+    pass

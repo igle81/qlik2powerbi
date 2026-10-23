@@ -1,0 +1,77 @@
+// Ejemplo inventado de una librería. No hay datos reales ni de clientes.
+
+SET ThousandSep='.';
+SET DecimalSep=',';
+SET DateFormat='YYYY-MM-DD';
+
+MapaRegion:
+MAPPING LOAD * INLINE [
+Codigo, Region
+N, Norte
+S, Sur
+E, Este
+O, Oeste
+];
+
+Clientes:
+LOAD
+    ClienteID,
+    Nombre as Cliente,
+    ApplyMap('MapaRegion', Zona, 'Sin región') as Region,
+    Pais
+FROM [lib://Datos/clientes.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+Productos:
+LOAD
+    ProductoID,
+    Nombre as Producto,
+    Categoria,
+    Precio
+FROM [lib://Datos/productos.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+Ventas:
+LOAD
+    PedidoID,
+    Fecha,
+    Year(Fecha) as Anio,
+    Month(Fecha) as Mes,
+    ClienteID,
+    ProductoID,
+    Cantidad,
+    Importe,
+    If(Importe > 1000, 'Alto', 'Normal') as Segmento
+FROM [lib://Datos/ventas.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq)
+WHERE Cantidad > 0;
+
+VentasSQL:
+SQL SELECT
+    PedidoID,
+    Estado
+FROM dbo.Pedidos
+WHERE Estado <> 'Anulado';
+
+LEFT JOIN (Ventas)
+LOAD
+    PedidoID,
+    Estado
+RESIDENT VentasSQL;
+
+Historico:
+LOAD * RESIDENT Ventas;
+
+CONCATENATE (Historico)
+LOAD
+    PedidoID,
+    Fecha,
+    Anio,
+    Mes,
+    ClienteID,
+    ProductoID,
+    Cantidad,
+    Importe,
+    Segmento
+FROM [lib://Datos/historico.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq);

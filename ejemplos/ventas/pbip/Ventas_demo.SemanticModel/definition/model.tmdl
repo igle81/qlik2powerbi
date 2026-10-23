@@ -1,0 +1,18 @@
+model Model
+	culture: es-ES
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: es-ES
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_QueryOrder = ["MapaRegion", "Clientes", "Productos", "Ventas", "VentasSQL", "Historico"]
+
+ref table MapaRegion
+ref table Clientes
+ref table Productos
+ref table Ventas
+ref table VentasSQL
+ref table Historico
+
+ref expression CarpetaDatos

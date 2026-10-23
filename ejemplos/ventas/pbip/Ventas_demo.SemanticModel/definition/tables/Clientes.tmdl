@@ -1,0 +1,51 @@
+table Clientes
+	lineageTag: 563368c9-e170-576e-aa11-ae8de23cb8b2
+
+	column ClienteID
+		dataType: int64
+		lineageTag: 88223ef9-982f-5db2-a736-dc62603d1300
+		summarizeBy: none
+		sourceColumn: ClienteID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cliente
+		dataType: string
+		lineageTag: a8ed3ca3-be1c-5502-b55d-2e70753a96ef
+		summarizeBy: none
+		sourceColumn: Cliente
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region
+		dataType: string
+		lineageTag: 339a6498-ad03-5e65-bdd6-4bdf49dd12d1
+		summarizeBy: none
+		sourceColumn: Region
+
+		annotation SummarizationSetBy = Automatic
+
+	column Pais
+		dataType: string
+		lineageTag: 85c54ce4-24cb-59fc-93e9-8d3edf635260
+		summarizeBy: none
+		sourceColumn: Pais
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Clientes = m
+		mode: import
+		source =
+			let
+			    Origen = Csv.Document(File.Contents(CarpetaDatos & "/clientes.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Encabezados = Table.PromoteHeaders(Origen, [PromoteAllScalars=true]),
+			    Tipos = Table.TransformColumnTypes(Encabezados, {{"ClienteID", Int64.Type}, {"Nombre", type text}, {"Zona", type text}, {"Pais", type text}}),
+			    AplicarMapa = Table.NestedJoin(Tipos, {"Zona"}, MapaRegion, {"Codigo"}, "mapa_qlik", JoinKind.LeftOuter),
+			    ExpandirMapa = Table.ExpandTableColumn(AplicarMapa, "mapa_qlik", {"Region"}, {"Region"}),
+			    DefectoMapa = Table.ReplaceValue(ExpandirMapa, null, "Sin región", Replacer.ReplaceValue, {"Region"}),
+			    Renombrar = Table.RenameColumns(DefectoMapa, {{"Nombre", "Cliente"}}),
+			    Seleccionar = Table.SelectColumns(Renombrar, {"ClienteID", "Cliente", "Region", "Pais"})
+			in
+			    Seleccionar
+
+	annotation PBI_ResultType = Table

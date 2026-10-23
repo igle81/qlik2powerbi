@@ -1,0 +1,71 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "a1ab51c77afc555bb5b3",
+  "position": {
+    "x": 16,
+    "y": 444,
+    "z": 5000,
+    "height": 280,
+    "width": 510,
+    "tabOrder": 5000
+  },
+  "visual": {
+    "visualType": "pieChart",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Clientes"
+                    }
+                  },
+                  "Property": "Region"
+                }
+              },
+              "queryRef": "Clientes.Region",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Ventas"
+                    }
+                  },
+                  "Property": "Importe total"
+                }
+              },
+              "queryRef": "Ventas.Importe total",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Importe por región'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

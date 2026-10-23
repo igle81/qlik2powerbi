@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "2c5124ad858a5749a7f4",
+  "position": {
+    "x": 1064,
+    "y": 380,
+    "z": 8000,
+    "height": 356,
+    "width": 200,
+    "tabOrder": 8000
+  },
+  "visual": {
+    "visualType": "slicer",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Productos"
+                    }
+                  },
+                  "Property": "Categoria"
+                }
+              },
+              "queryRef": "Productos.Categoria",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Categoría'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

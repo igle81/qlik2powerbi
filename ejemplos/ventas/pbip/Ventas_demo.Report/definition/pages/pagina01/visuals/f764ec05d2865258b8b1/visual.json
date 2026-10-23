@@ -1,0 +1,71 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "f764ec05d2865258b8b1",
+  "position": {
+    "x": 538,
+    "y": 152,
+    "z": 4000,
+    "height": 280,
+    "width": 510,
+    "tabOrder": 4000
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Ventas"
+                    }
+                  },
+                  "Property": "Mes"
+                }
+              },
+              "queryRef": "Ventas.Mes",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Ventas"
+                    }
+                  },
+                  "Property": "Importe total"
+                }
+              },
+              "queryRef": "Ventas.Importe total",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Importe por mes'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

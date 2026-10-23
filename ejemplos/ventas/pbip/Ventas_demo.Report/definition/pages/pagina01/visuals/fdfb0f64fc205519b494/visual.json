@@ -1,0 +1,71 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "fdfb0f64fc205519b494",
+  "position": {
+    "x": 16,
+    "y": 152,
+    "z": 3000,
+    "height": 280,
+    "width": 510,
+    "tabOrder": 3000
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Productos"
+                    }
+                  },
+                  "Property": "Categoria"
+                }
+              },
+              "queryRef": "Productos.Categoria",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Ventas"
+                    }
+                  },
+                  "Property": "Importe total"
+                }
+              },
+              "queryRef": "Ventas.Importe total",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Importe por categoría'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

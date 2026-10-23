@@ -1,0 +1,29 @@
+relationship 50a0fc30-744f-56ce-9d22-57150f735043
+	fromColumn: Ventas.ClienteID
+	toColumn: Clientes.ClienteID
+	crossFilteringBehavior: oneDirection
+
+relationship 18f78817-e706-5916-af1f-8584ad94ec86
+	fromColumn: Historico.ClienteID
+	toColumn: Clientes.ClienteID
+	crossFilteringBehavior: oneDirection
+
+relationship c560d69e-53c1-5a50-abeb-9779890bcfbe
+	fromColumn: Ventas.ProductoID
+	toColumn: Productos.ProductoID
+	crossFilteringBehavior: oneDirection
+
+relationship 199d69a9-73a0-5539-866d-d3bf48f4433b
+	fromColumn: Historico.ProductoID
+	toColumn: Productos.ProductoID
+	crossFilteringBehavior: oneDirection
+
+relationship 83f0b2a9-38a0-5e65-ab3e-cab46065d422
+	fromColumn: Ventas.PedidoID
+	toColumn: VentasSQL.PedidoID
+	crossFilteringBehavior: oneDirection
+
+relationship 25c3467c-2552-504f-8a10-a6a83cc4c8ff
+	fromColumn: Historico.PedidoID
+	toColumn: VentasSQL.PedidoID
+	crossFilteringBehavior: oneDirection

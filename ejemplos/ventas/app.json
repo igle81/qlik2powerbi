@@ -1,0 +1,30 @@
+{
+  "app": "Ventas demo",
+  "description": "Exportación inventada para probar la conversión. No procede de una app real.",
+  "measures": [
+    {"name": "Importe total", "expression": "Sum(Importe)"},
+    {"name": "Pedidos", "expression": "Count(DISTINCT PedidoID)"},
+    {"name": "Importe 2024", "expression": "Sum({<Anio={2024}>} Importe)"},
+    {"name": "Ticket medio", "expression": "If(Count(DISTINCT PedidoID) > 0, Sum(Importe) / Count(DISTINCT PedidoID), 0)"},
+    {"name": "Importe por cliente", "expression": "Sum(Aggr(Sum(Importe), Cliente))"},
+    {"name": "Importe sin año", "expression": "Sum({<Anio=>} Importe)"},
+    {"name": "Importe del variable", "expression": "Sum({<Anio={$(vAnio)}>} Importe)"},
+    {"name": "Mes anterior", "expression": "Above(Sum(Importe))"}
+  ],
+  "sheets": [
+    {
+      "name": "Resumen comercial",
+      "objects": [
+        {"type": "kpi", "title": "Importe total", "measures": ["Importe total"]},
+        {"type": "kpi", "title": "Pedidos", "measures": ["Pedidos"]},
+        {"type": "kpi", "title": "Ticket medio", "measures": ["Ticket medio"]},
+        {"type": "barchart", "title": "Importe por categoría", "dimensions": ["Categoria"], "measures": ["Importe total"]},
+        {"type": "linechart", "title": "Importe por mes", "dimensions": ["Mes"], "measures": ["Importe total"]},
+        {"type": "piechart", "title": "Importe por región", "dimensions": ["Region"], "measures": ["Importe total"]},
+        {"type": "table", "title": "Detalle por cliente", "dimensions": ["Cliente", "Region"], "measures": ["Importe total", "Pedidos"]},
+        {"type": "filterpane", "title": "Año", "dimensions": ["Anio"]},
+        {"type": "filterpane", "title": "Categoría", "dimensions": ["Categoria"]}
+      ]
+    }
+  ]
+}
