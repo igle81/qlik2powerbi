@@ -1,192 +1,179 @@
-# Qlik to Power BI Migration
+# De Qlik a Power BI
 
-![Qlik Sense](https://img.shields.io/badge/Qlik_Sense-009848?style=for-the-badge&logo=qlik&logoColor=white)
-![Arrow](https://img.shields.io/badge/%E2%86%92-grey?style=for-the-badge)
-![Power BI](https://img.shields.io/badge/Power_BI-F2C811?style=for-the-badge&logo=powerbi&logoColor=black)
+`qlik2pbi` genera un proyecto de Power BI Desktop (PBIP) a partir de lo mínimo de una app de Qlik: el script de carga y la exportación de hojas y objetos. El modelo, las consultas M, las medidas DAX y las páginas del informe salen en local. No se envía nada a un servicio externo ni a una IA de pago.
 
-![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-12.0.0-blue?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)
-![Openability](https://img.shields.io/badge/openability-checked-success?style=flat-square)
+## Aviso de licencia y atribución
 
-Migrate Qlik Sense applications to Power BI `.pbip` projects with one command, while keeping the output structured, validated, and easy to inspect.
+Este repositorio es un fork de [cyphou/Qlik-To-PowerBI](https://github.com/cyphou/Qlik-To-PowerBI). El README de origen muestra una insignia MIT, pero el árbol no incluye un fichero `LICENSE` y la API de licencias de GitHub no detecta ninguna. **El código heredado está sin licencia.**
 
-## Migration Flow
+El uso comercial de las partes heredadas necesita permiso del autor o hay que reescribirlas. Esas partes siguen en el repositorio y no forman parte del camino que cubre esta entrega:
 
-```mermaid
-flowchart LR
-  A[Qlik App\n.qvf / .json / .qvw] --> B[Extraction\nqlik_export/]
-  B --> C[Conversion\nDAX + Power Query M + TMDL]
-  C --> D[Validation\nSchema + relationship + Desktop openability]
-  D --> E[Power BI Project\n.pbip + SemanticModel + Report]
-  E --> F[Comparison & Lineage\nHTML reports]
+- `migrate.py`
+- `qlik_export/`
+- `powerbi_import/`
+- `tools/`
+- `src/`
+- `web/app.py`
+- los tests y la documentación anteriores
+
+El paquete `qlik2pbi/`, la web (`qlik2pbi/pagina.py`, `api/`) y el ejemplo de `ejemplos/ventas/` son una reescritura de este fork. No importan el conversor heredado. Este README no reclama MIT para el repositorio completo y no se ha añadido un `LICENSE` que cubriera el código heredado.
+
+## Qué hace la herramienta
+
+La entrada es:
+
+1. El script de carga (`.qvs` o el texto del script).
+2. La exportación de la app (JSON o XML de hojas y objetos, o un `.qvf` que sea un ZIP con ese JSON).
+
+La salida es una carpeta lista para abrir en Power BI Desktop:
+
+```
+salida/
+  INFORME.md
+  Nombre.pbip
+  Nombre.SemanticModel/
+    definition.pbism
+    definition/
+      database.tmdl
+      model.tmdl
+      relationships.tmdl
+      expressions.tmdl
+      tables/*.tmdl
+  Nombre.Report/
+    definition.pbir
+    definition/report.json
+    definition/pages/.../visuals/.../visual.json
 ```
 
-## Architecture
+Incluye las tablas y relaciones sacadas del script, las consultas Power Query equivalentes a los `LOAD` y `SQL SELECT`, las medidas DAX traducidas de las expresiones de Qlik y las páginas con gráficos de barras, líneas, tarta, tabla, KPI y filtros.
 
-```mermaid
-flowchart TB
-  subgraph Qlik
-    A[Qlik App\n.qvf / .json / .qvw]
-    B[Extraction Layer\nqlik_export/]
-  end
+## Instalación
 
-  subgraph PowerBI
-    C[Conversion Layer\nDAX + M + TMDL]
-    D[Validation Layer\nDesktop openability + QA]
-    E[Generated Project\n.pbip + Report + SemanticModel]
-  end
-
-  subgraph Review
-    F[Comparison Report]
-    G[Data Prep Lineage]
-    H[End-to-End Lineage]
-  end
-
-  A --> B --> C --> D --> E
-  E --> F
-  E --> G
-  E --> H
-```
-
-## At A Glance
-
-- 🧭 Input: `.qvf`, `.json`, or `.qvw` with converted siblings
-- 🧱 Output: Power BI `.pbip` projects with Semantic Model and Report folders
-- 🔁 Workflow: extraction → conversion → validation → Desktop openability checks
-- 🧪 Quality gates: schema validation, DAX checks, M checks, relationship checks, and post-generation validation
-- 📚 Parity-friendly docs: clear CLI entry points, report artifacts, and lineage sections
-
-## Who It's For
-
-- 🧪 Migration engineers who need reproducible conversion and validation runs
-- 📊 BI developers who want the generated project to stay readable in Power BI Desktop
-- 🧭 Reviewers who need comparison, lineage, and openability evidence in one place
-- ⚙️ Automation users who want a CLI-first workflow for batch runs and CI
-
-## Input / Output
-
-| Stage | What It Means | Artifact |
-|---|---|---|
-| Input | Qlik source app or export | `.qvf`, `.json`, `.qvw` |
-| Extraction | Parse Qlik objects and script | `qlik_export/` JSON files |
-| Conversion | Build model and report layers | DAX, Power Query M, TMDL |
-| Validation | Check structure and openability | QA and Desktop gate results |
-| Output | Power BI project package | `.pbip`, `.SemanticModel`, `.Report` |
-| Review | Inspect what changed and why | Comparison and lineage HTML reports |
-
-## Why This Project
-
-This repository is designed for repeatable Qlik-to-Power-BI migration work, with a presentation style closer to a polished product README than a raw tool dump.
-
-- ✨ Clear first-run path for new users
-- 🛠️ Direct CLI usage for automation and batch migration
-- 📈 Report artifacts that make migration quality visible
-- 🧩 Lineage, comparison, and validation outputs that support review workflows
-
-## Installation
-
-Create a virtual environment and install the development dependencies:
+Hace falta Python 3.10 o superior. No hay dependencias de pago.
 
 ```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -e ".[dev]"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+qlik2pbi --script carga.qvs --export app.json --out ./salida
 ```
 
-## Quick Start
-
-### 1. Migrate one app
+Sin instalar el paquete:
 
 ```bash
-python migrate.py app.qvf
+python3 -m qlik2pbi --script carga.qvs --export app.json --out ./salida
 ```
 
-### 2. Migrate a folder
+`--zip` deja además `Nombre.zip` dentro de la carpeta de salida. `--nombre` fija el nombre del proyecto; si se omite, sale del título de la app.
+
+Al abrir el PBIP, apunta el parámetro `CarpetaDatos` a la carpeta de los CSV. El ejemplo usa `ejemplos/ventas/datos`.
+
+## Web
+
+La página está en español y pensada para [powerbi.avilesia.es](https://powerbi.avilesia.es) en Vercel. Antes de subir ficheros o descargar el ZIP pide un código de acceso. Los ficheros se leen en memoria, el PBIP se escribe en un directorio temporal que se borra al terminar y la respuesta lleva `Cache-Control: no-store`. No hay base de datos ni llamadas externas. Cada fichero puede pesar hasta 4 MB. Toda la web lleva `noindex` (`X-Robots-Tag`, meta robots y `public/robots.txt`).
+
+La línea de comandos no consulta estas variables. Solo las usa la web.
+
+### ACCESS_CODE
+
+Es el código que hay que escribir en el formulario. Se lee en el servidor, en cada petición, desde la variable de entorno `ACCESS_CODE`. No tiene valor por defecto y no se guarda en el repositorio ni en la cookie. La comparación usa `hmac.compare_digest` sobre el resumen SHA-256 de los dos textos, así la duración no depende de en qué carácter difieren.
+
+Si `ACCESS_CODE` falta o está vacío, la web no deja entrar a nadie: no muestra el formulario de subida y rechaza la conversión.
+
+### SESSION_SECRET
+
+Secreto con el que se firma la cookie `qlik2pbi_sesion` (HMAC-SHA256). También es una variable de entorno, sin valor por defecto y fuera del repositorio. Si falta, la web queda cerrada igual que sin código, porque no se puede firmar la sesión.
+
+Con el código correcto el servidor responde una cookie `HttpOnly`, `SameSite=Lax` y, si la petición llega por HTTPS, `Secure`. Caduca a las 12 horas. La cookie lleva la caducidad y la firma, no el código. Cambiar `ACCESS_CODE` invalida las sesiones ya emitidas. En local, por HTTP, la cookie se envía sin `Secure` para poder probar en `http://127.0.0.1:8000`.
+
+Genera un secreto en tu máquina, sin enviarlo a ningún sitio:
 
 ```bash
-python migrate.py ./exports
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-### 3. Send output somewhere else
+En Vercel, proyecto de powerbi.avilesia.es, define `ACCESS_CODE` y `SESSION_SECRET` en Settings → Environment Variables. No las pongas en `vercel.json` ni en un fichero del repo.
+
+### Intentos
+
+Tras 5 códigos incorrectos desde la misma IP, en una ventana de 15 minutos, el servidor responde 429 y no comprueba más códigos hasta que pasa la ventana. El contador vive en la memoria de cada instancia. En Vercel no es un candado global: frena un intento repetido contra una instancia y no usa ningún servicio de pago. La IP sale de `X-Real-IP` o, si no viene, del último salto de `X-Forwarded-For`.
+
+En local:
 
 ```bash
-python migrate.py app.qvf --out ./output
+ACCESS_CODE='un-codigo' SESSION_SECRET='un-secreto-largo' python3 -m qlik2pbi.serve
 ```
 
-Input routing, binary model discovery, many-to-many bridge generation,
-validation, repair, and Power BI Desktop openability checks are automatic.
+Abre `http://127.0.0.1:8000`, entra con el código y después sube los dos ficheros.
 
-## Core Capabilities
+En Vercel, el proyecto es la raíz del repositorio. `/` se reescribe a la función `api/app.py`. El código entra por `api/acceso.py` y la conversión por `api/convert.py`. Las tres usan la biblioteca estándar. `vercel.json` deja fuera del despliegue el código heredado y los ejemplos, y añade `noindex` a todas las rutas.
 
-- 🧠 Qlik expressions to DAX conversion
-- 🔄 Qlik load script to Power Query M conversion
-- 🧱 TMDL semantic model generation
-- 🖼️ Visual mapping to PBIR report layout
-- 🛡️ Validation, QA, and deployment workflows
-- 📉 Comparison and lineage reports for review and cutover
+## Ejemplo
 
-## Output
+`ejemplos/ventas/` es una librería inventada. No hay datos reales. El script carga un mapa de regiones, clientes, productos, ventas, un `SQL SELECT` sin `CONNECT`, un `LEFT JOIN`, un `RESIDENT` y un `CONCATENATE`. La exportación JSON tiene una hoja con tres KPI, una barra, una línea, una tarta, una tabla y dos filtros.
 
-A successful run generates a Power BI project:
-
-```text
-artifacts/powerbi_projects/<AppName>/
-  <AppName>.pbip
-  <AppName>.SemanticModel/
-  <AppName>.Report/
-```
-
-Open the `.pbip` directly in Power BI Desktop (Developer Mode).
-
-## Reports And Lineage
-
-- 📊 [comparison_report.html](artifacts/powerbi_projects/comparison_report.html) — side-by-side migration comparison
-- 🧬 End-to-end lineage — source field → M → DAX → TMDL → visual
-- 🧪 Data preparation lineage — Qlik script flow and Power Query M steps
-- 🧰 Desktop openability checks — generated projects are tested against Power BI Desktop behavior
-
-## Documentation
-
-Start with the documentation hub:
-
-- [docs/README.md](docs/README.md)
-
-Most used guides:
-
-- [Quick Start](docs/guides/QUICK_START.md)
-- [CLI Reference](docs/guides/CLI_REFERENCE.md)
-- [Migration Guide](docs/guides/MIGRATION_GUIDE.md)
-- [Deployment Guide](docs/guides/DEPLOYMENT_GUIDE.md)
-- [FAQ](docs/FAQ.md)
-
-Useful lineage and validation references:
-
-- [Data Preparation Lineage](docs/DATA_PREP_LINEAGE.md)
-- [Data Prep Lineage Guide](docs/DATA_PREP_LINEAGE_GUIDE.md)
-- [Tableau parity roadmap](docs/reports/TABLEAU_PARITY_SYNC_ROADMAP_2026-06-24.md)
-
-## Testing
-
-The repository includes more than 2,000 automated tests covering extraction,
-conversion, generation, validation, and Power BI Desktop openability.
+El PBIP ya generado está en `ejemplos/ventas/pbip` (`Ventas_demo`). Con el ejemplo salen 6 tablas, 6 relaciones, 8 medidas, 1 página y 9 gráficos. Tres avisos quedan a mano: el SQL sin servidor, una variable `$(vAnio)` y `Above`.
 
 ```bash
-# Run tests
-python -m pytest tests/ -q
-
-# Focused CLI tests
-python -m pytest tests/test_new_cli_flags.py tests/test_simple_mode.py -q
+python3 -m qlik2pbi \
+  --script ejemplos/ventas/carga.qvs \
+  --export ejemplos/ventas/app.json \
+  --out ./salida
 ```
 
-## Project Shape
+## Pruebas
 
-- `migrate.py` — main migration CLI
-- `qlik_export/` — extraction and conversion layer
-- `powerbi_import/` — Power BI generation and validation layer
-- `artifacts/` — generated projects, reports, and run outputs
-- `docs/` — guides, parity notes, and roadmap material
+```bash
+python3 -m pytest tests/test_qlik2pbi_ejemplo.py tests/test_qlik2pbi_acceso.py -q
+```
 
-## License
+Comprueban que el TMDL y el `report.json` del ejemplo son válidos, que la CLI regenera el mismo árbol, que `GROUP BY` pasa a `Table.Group`, que una exportación XML también genera un PBIP, que la web devuelve el ZIP en memoria solo con la cookie de sesión, y que sin `ACCESS_CODE` no entra nadie.
 
-MIT
+La batería heredada (`python3 -m pytest`) cubre el conversor anterior y no es necesaria para esta entrega.
+
+## Cobertura
+
+La misma lista sale en el `INFORME.md` de cada ejecución (`qlik2pbi/cobertura.py`).
+
+### Se traduce
+
+| Qlik | Power BI | Nota |
+| --- | --- | --- |
+| Sum, Count, Avg, Min, Max | SUM, COUNT, AVERAGE, MIN, MAX | `Count(DISTINCT campo)` pasa a `DISTINCTCOUNT`. |
+| Only | SELECTEDVALUE | Un valor visible en el contexto actual. |
+| If, and, or, not | IF, &&, \|\|, NOT | `If` anidado incluido. |
+| Aggr | SUMX / VALUES o SUMMARIZE | Un nivel. `Sum(Aggr(...))` no se suma dos veces. |
+| Set Analysis básico | CALCULATE | `{<Campo={valor}>}`, listas, exclusión, filtro vacío `{<Campo=>}`, `{1}` y `{$}`. |
+| Year, Month, Day, Today, Now | YEAR, MONTH, DAY, TODAY, NOW en DAX; `Date.Year` y similares en M | En el script se aplican fila a fila. |
+| Upper, Lower, Trim, Len, Round, Abs | UPPER, LOWER, TRIM, LEN, ROUND, ABS en DAX; `Text.*` y `Number.*` en M | |
+| ApplyMap | `Table.NestedJoin` en M | La tabla `MAPPING` se conserva oculta. |
+| Join (left, inner, right, outer) | `Table.NestedJoin` | Las columnas del JOIN entran en la tabla destino. |
+| Concatenate | `Table.Combine` | Une por nombre de columna. |
+| Resident | Referencia a la otra consulta M | La consulta ve la definición final de la tabla. |
+| LOAD FROM csv/txt | `Csv.Document` | Delimitador y página de códigos del especificador Qlik. |
+| LOAD FROM xlsx | `Excel.Workbook` | Usa la hoja de `table is`. |
+| INLINE | `#table` | |
+| SQL SELECT | `Sql.Database` | Sin `CONNECT`, el servidor queda como marcador y se avisa. |
+| WHERE | `Table.SelectRows` | |
+| GROUP BY | `Table.Group` | Sum, Avg, Count, Min y Max sobre un campo. |
+| Gráficos de barra, línea, tarta, tabla, KPI y filtro | clusteredBarChart, lineChart, pieChart, tableEx, card, slicer | El resto de tipos pasa a tabla y se avisa. |
+
+### Queda como aviso para revisar a mano
+
+| Construcción | Por qué |
+| --- | --- |
+| Above, Below, Before, After, Top, Bottom | Funciones inter-registro. La medida queda en `BLANK()` y se conserva el texto original. |
+| Peek, Previous, Exists, RangeSum, RangeAvg | Dependen del orden de carga o de una ventana. |
+| Set Analysis con `P()`, `E()`, estados alternos (`::`), unión o intersección de conjuntos | Solo se traduce el modificador de campo simple. |
+| Dólar `$(variable)` dentro del análisis de conjuntos | Power BI no expande variables de script. |
+| Aggr anidado | El anidamiento no se aplana solo. |
+| Dual, Class, FirstSortedValue, Rank, Correl, Fractile | Sin traducción fiel de una línea. |
+| IntervalMatch, Crosstable, Generic, Hierarchy | Cambian la forma de la tabla. |
+| QVD | Power Query no lee QVD. Se deja un CSV homónimo y un aviso. |
+| Section Access | No se genera RLS. |
+| For each, bucles, subrutinas y BINARY | El control de flujo del script no se ejecuta. |
+| Extensiones, mapas y gráficos no estándar | El objeto pasa a tabla para no perder el dato. |
+
+## El conversor heredado
+
+`python migrate.py` sigue siendo la entrada del toolkit anterior (un `.qvf` o un JSON de app, asistente Streamlit en `web/app.py`). Ese flujo no es el contrato `--script` + `--export` y escribe ficheros temporales. Para un PBIP a partir del script y de la exportación, usa `qlik2pbi`.

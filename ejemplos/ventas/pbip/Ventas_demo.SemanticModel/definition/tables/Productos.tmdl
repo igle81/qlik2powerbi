@@ -1,0 +1,48 @@
+table Productos
+	lineageTag: 7da616a0-0058-51de-9e41-4e63e6c50c82
+
+	column ProductoID
+		dataType: int64
+		lineageTag: 8c7c5b86-0d74-5896-88f4-dafbd8db1d1b
+		summarizeBy: none
+		sourceColumn: ProductoID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Producto
+		dataType: string
+		lineageTag: 02899509-ad77-57f0-93bf-b7537bd1a919
+		summarizeBy: none
+		sourceColumn: Producto
+
+		annotation SummarizationSetBy = Automatic
+
+	column Categoria
+		dataType: string
+		lineageTag: a7a929cb-f522-5c81-8cd7-f1df37c83d0c
+		summarizeBy: none
+		sourceColumn: Categoria
+
+		annotation SummarizationSetBy = Automatic
+
+	column Precio
+		dataType: double
+		lineageTag: a6db71ef-d723-510c-9d34-d649bede89a6
+		summarizeBy: sum
+		sourceColumn: Precio
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Productos = m
+		mode: import
+		source =
+			let
+			    Origen = Csv.Document(File.Contents(CarpetaDatos & "/productos.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Encabezados = Table.PromoteHeaders(Origen, [PromoteAllScalars=true]),
+			    Tipos = Table.TransformColumnTypes(Encabezados, {{"ProductoID", Int64.Type}, {"Nombre", type text}, {"Categoria", type text}, {"Precio", type number}}),
+			    Renombrar = Table.RenameColumns(Tipos, {{"Nombre", "Producto"}}),
+			    Seleccionar = Table.SelectColumns(Renombrar, {"ProductoID", "Producto", "Categoria", "Precio"})
+			in
+			    Seleccionar
+
+	annotation PBI_ResultType = Table

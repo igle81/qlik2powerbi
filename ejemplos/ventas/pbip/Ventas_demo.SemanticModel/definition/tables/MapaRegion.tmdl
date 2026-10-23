@@ -1,0 +1,29 @@
+table MapaRegion
+	isHidden
+	lineageTag: 6bd2c9bc-a1eb-5eec-be6b-1da9339edeb3
+
+	column Codigo
+		dataType: string
+		lineageTag: 8cdd6154-d7f2-50ed-b236-83ad6a916d49
+		summarizeBy: none
+		sourceColumn: Codigo
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region
+		dataType: string
+		lineageTag: 07f79205-c0eb-5f22-ae84-e1c41290eda4
+		summarizeBy: none
+		sourceColumn: Region
+
+		annotation SummarizationSetBy = Automatic
+
+	partition MapaRegion = m
+		mode: import
+		source =
+			let
+			    Origen = #table({"Codigo", "Region"}, {{"N", "Norte"}, {"S", "Sur"}, {"E", "Este"}, {"O", "Oeste"}})
+			in
+			    Origen
+
+	annotation PBI_ResultType = Table

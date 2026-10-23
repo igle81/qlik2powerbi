@@ -1,0 +1,28 @@
+table VentasSQL
+	lineageTag: 518247cf-9b54-5282-8122-b5c4d9045ee0
+
+	column PedidoID
+		dataType: int64
+		lineageTag: 03b1ede7-bcdb-5ef8-b228-02fc07f9f5f0
+		summarizeBy: none
+		sourceColumn: PedidoID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Estado
+		dataType: string
+		lineageTag: f3842173-40ec-55f9-8d7b-6546a1a48f80
+		summarizeBy: none
+		sourceColumn: Estado
+
+		annotation SummarizationSetBy = Automatic
+
+	partition VentasSQL = m
+		mode: import
+		source =
+			let
+			    Origen = Sql.Database("SERVIDOR", "BASEDATOS", [Query="SELECT PedidoID, Estado FROM dbo.Pedidos WHERE Estado <> 'Anulado'"])
+			in
+			    Origen
+
+	annotation PBI_ResultType = Table
